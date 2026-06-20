@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Cloud Planner</title>
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a252f">
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body onload="init()">
+
+    <div class="header">
+        <div class="user-profile" id="user-profile">
+            <button onclick="login()" class="login-btn">🔐 دخول بجوجل</button>
+        </div>
+        <h1>Task Cloud Planner</h1>
+        <button onclick="addNewDay()" class="add-day-btn" id="add-day-btn" style="display: none;">➕ إضافة يوم جديد</button>
+    </div>
+
+    <div class="dashboard-panel" id="dashboard-panel" style="display: none;">
+        <div class="stat-card">
+            <span class="stat-title">المهام المكتملة</span>
+            <span class="stat-value" id="stat-completed">0</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-title">إجمالي المهام</span>
+            <span class="stat-value" id="stat-total">0</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-title">نسبة الإنجاز العامة</span>
+            <span class="stat-value" id="stat-ratio">0%</span>
+        </div>
+    </div>
+
+    <div class="search-bar-container" id="search-container" style="display: none;">
+        <input type="text" id="search-input" oninput="filterTasks()" placeholder="🔍 ابحث عن مهمة أو تاريخ معين...">
+    </div>
+
+    <div id="tasks-container" class="week-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
