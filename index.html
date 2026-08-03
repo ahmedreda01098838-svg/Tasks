@@ -5,22 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>منظم المهام اليومية</title>
     
-    <!-- Preconnect للمكتبات الخارجية لتسريع الاتصال -->
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
     <link rel="stylesheet" href="style.css">
     
-    <!-- تحميل المكتبات مع تأجيل التنفيذ لتسريع ظهور الصفحة -->
     <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
 
-    <!-- Firebase SDKs -->
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
-    <!-- Script الرئيسي مع defer -->
     <script defer src="script.js"></script>
 </head>
 <body>
@@ -50,9 +46,15 @@
     </div>
 
     <main class="week-container" id="tasks-container">
-        <!-- مؤشر تحميل سريع لحين تجهيز البيانات -->
         <p id="loading-spinner" style="text-align:center; color: var(--text-muted); margin-top: 40px;">جاري تحميل المهام...</p>
     </main>
+
+    <!-- زر تحميل المزيد من الأيام القديمة -->
+    <div style="width: 100%; max-width: 700px; text-align: center; margin: 20px 0;">
+        <button id="load-more-btn" onclick="loadMoreTasks()" style="display: none; margin: 0 auto; background: var(--card-bg); color: var(--text); border: 1px solid var(--border-color); padding: 12px 24px;">
+            📥 عرض الأيام السابقة
+        </button>
+    </div>
 
     <button class="scroll-top-btn" onclick="scrollToTop()" title="للأعلى">⬆</button>
 
