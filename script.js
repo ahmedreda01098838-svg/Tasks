@@ -11,12 +11,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// تفعيل الكاش المحلي لفتح البيانات فوراً بدون انتظار الإنترنت
 db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
   if (err.code === "failed-precondition") {
     console.warn("التخزين المحلي يعمل في تبويب آخر.");
-  } else if (err.code === "unimplemented") {
-    console.warn("المتصفح لا يدعم التخزين المحلي.");
   }
 });
 
@@ -24,6 +21,9 @@ let currentUser = null;
 let activeListeners = {};
 let globalStats = {};
 let midnightTimer = null;
+
+let lastVisibleDoc = null; // يحفظ آخر يوم تم تحميله للبدء منه في التحميل القادم
+const PAGE_SIZE = 10;      // عدد الأيام في كل دفعة
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -33,6 +33,7 @@ function init() {
     const dashboard = document.getElementById("dashboard-panel");
     const searchBar = document.getElementById("search-container");
     const container = document.getElementById("tasks-container");
+    const loadMoreBtn = document.getElementById("load-more-btn");
 
     if (user) {
       currentUser = user;
@@ -50,11 +51,12 @@ function init() {
 
       autoAddTodayIfMissing();
       scheduleMidnightAutoAdd();
-      loadTasks();
+      loadInitialTasks();
     } else {
       currentUser = null;
       if (dashboard) dashboard.style.display = "none";
       if (searchBar) searchBar.style.display = "none";
+      if (loadMoreBtn) loadMoreBtn.style.display = "none";
       
       if (container) {
         container.innerHTML =
@@ -95,7 +97,7 @@ function autoAddTodayIfMissing() {
   db.collection("task_days")
     .where("userId", "==", currentUser.uid)
     .where("date", "==", todayFormatted)
-    .get({ source: "default" })
+    .get()
     .then((snapshot) => {
       if (snapshot.empty) {
         db.collection("task_days").add({
@@ -135,16 +137,17 @@ function logout() {
   auth.signOut();
 }
 
-function loadTasks() {
+// تحميل أول دفعة من الأيام (الأحدث)
+function loadInitialTasks() {
   const container = document.getElementById("tasks-container");
+  const loadMoreBtn = document.getElementById("load-more-btn");
   if (!container || !currentUser) return;
 
-  // جلب آخر 15 يوم فقط لتخفيف الحمل وسرعة الاستجابة
   db.collection("task_days")
     .where("userId", "==", currentUser.uid)
     .orderBy("createdAt", "desc")
-    .limit(15)
-    .onSnapshot({ includeMetadataChanges: true }, (snap) => {
+    .limit(PAGE_SIZE)
+    .onSnapshot((snap) => {
       const loadingSpinner = document.getElementById("loading-spinner");
       if (loadingSpinner) loadingSpinner.remove();
 
@@ -152,7 +155,15 @@ function loadTasks() {
         container.innerHTML =
           '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">لا توجد أيام مضافة بعد.</p>';
         updateGlobalDashboard();
+        if (loadMoreBtn) loadMoreBtn.style.display = "none";
         return;
+      }
+
+      lastVisibleDoc = snap.docs[snap.docs.length - 1];
+
+      // إظهار زر تحميل المزيد لو عدد الأيام بيساوي الحد الأقصى للدفعة
+      if (loadMoreBtn) {
+        loadMoreBtn.style.display = snap.docs.length >= PAGE_SIZE ? "block" : "none";
       }
 
       snap.docChanges().forEach((change) => {
@@ -174,8 +185,42 @@ function loadTasks() {
           updateGlobalDashboard();
         }
       });
-    }, (error) => {
-      console.error("Firebase Error:", error);
+    });
+}
+
+// تحميل الدفعة التالية (الأيام الأقدم) عند الضغط على الزر
+function loadMoreTasks() {
+  if (!lastVisibleDoc || !currentUser) return;
+
+  const loadMoreBtn = document.getElementById("load-more-btn");
+  if (loadMoreBtn) loadMoreBtn.textContent = "جاري التحميل...";
+
+  db.collection("task_days")
+    .where("userId", "==", currentUser.uid)
+    .orderBy("createdAt", "desc")
+    .startAfter(lastVisibleDoc)
+    .limit(PAGE_SIZE)
+    .get()
+    .then((snap) => {
+      if (snap.empty) {
+        if (loadMoreBtn) loadMoreBtn.style.display = "none";
+        return;
+      }
+
+      lastVisibleDoc = snap.docs[snap.docs.length - 1];
+
+      snap.docs.forEach((doc) => {
+        renderDay(doc, -1); // -1 تعني إضافته في القاع (تحت خالص)
+      });
+
+      if (loadMoreBtn) {
+        loadMoreBtn.textContent = "📥 عرض الأيام السابقة";
+        loadMoreBtn.style.display = snap.docs.length >= PAGE_SIZE ? "block" : "none";
+      }
+    })
+    .catch((err) => {
+      console.error("خطأ في تحميل الأيام القديمة:", err);
+      if (loadMoreBtn) loadMoreBtn.textContent = "📥 عرض الأيام السابقة";
     });
 }
 
@@ -206,7 +251,7 @@ function renderDay(doc, targetIndex) {
     `;
 
   const existingChildren = container.children;
-  if (targetIndex >= existingChildren.length) {
+  if (targetIndex === -1 || targetIndex >= existingChildren.length) {
     container.appendChild(dayCard);
   } else {
     container.insertBefore(dayCard, existingChildren[targetIndex]);
