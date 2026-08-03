@@ -45,7 +45,7 @@ body {
   align-items: center;
   width: 100%;
   max-width: 700px;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
   background: var(--card-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -61,14 +61,6 @@ body {
   background: linear-gradient(135deg, #a5b4fc, #6366f1);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-}
-
-.top-controls {
-  width: 100%;
-  max-width: 700px;
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 15px;
 }
 
 .user-profile {
@@ -112,19 +104,6 @@ button {
 .login-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5);
-}
-
-.add-day-btn {
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: white;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
-  width: 100%;
-  justify-content: center;
-}
-
-.add-day-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
 }
 
 .logout-btn {
