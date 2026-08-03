@@ -11,7 +11,6 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// تفعيل حفظ البيانات أوفلاين
 db.enablePersistence().catch((err) => {
   if (err.code == "failed-precondition")
     console.warn("حسابات متعددة مفتوحة، تم إلغاء التخزين المحلي مؤقتاً.");
@@ -20,8 +19,8 @@ db.enablePersistence().catch((err) => {
 let currentUser = null;
 let activeListeners = {};
 let globalStats = {};
+let midnightTimer = null;
 
-// دالة البدء ومراقبة حالة تسجيل الدخول
 function init() {
   auth.onAuthStateChanged((user) => {
     const profileDiv = document.getElementById("user-profile");
@@ -42,6 +41,11 @@ function init() {
             <button onclick="logout()" class="logout-btn" title="تسجيل الخروج">🚪</button>
         </div>
       `;
+      
+      // التاكد التلقائي من إضافة يوم اليوم + جدولة منتصف الليل
+      autoAddTodayIfMissing();
+      scheduleMidnightAutoAdd();
+
       loadTasks();
     } else {
       currentUser = null;
@@ -52,10 +56,60 @@ function init() {
         '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">يرجى تسجيل الدخول أولاً لحفظ مهامك سحابياً.</p>';
       profileDiv.innerHTML = `<button onclick="login()" class="login-btn">🔐 دخول بجوجل</button>`;
 
+      if (midnightTimer) clearTimeout(midnightTimer);
       Object.keys(activeListeners).forEach((id) => activeListeners[id]());
       activeListeners = {};
     }
   });
+}
+
+function getFormattedDate(dateObj = new Date()) {
+  const options = {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  };
+  return dateObj.toLocaleDateString("ar-EG", options);
+}
+
+// التاكد من وجود اليوم الحالي وإضافته تلقائياً عند فتح التطبيق
+function autoAddTodayIfMissing() {
+  if (!currentUser) return;
+  const todayFormatted = getFormattedDate();
+
+  db.collection("task_days")
+    .where("userId", "==", currentUser.uid)
+    .where("date", "==", todayFormatted)
+    .get()
+    .then((snapshot) => {
+      if (snapshot.empty) {
+        db.collection("task_days").add({
+          date: todayFormatted,
+          userId: currentUser.uid,
+          createdAt: new Date().getTime(),
+        });
+      }
+    });
+}
+
+// جدولة التحديث التلقائي عند حلول 12 منتصف الليل بالضبط
+function scheduleMidnightAutoAdd() {
+  if (midnightTimer) clearTimeout(midnightTimer);
+
+  const now = new Date();
+  const midnight = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1,
+    0, 0, 1
+  );
+  const timeUntilMidnight = midnight.getTime() - now.getTime();
+
+  midnightTimer = setTimeout(() => {
+    autoAddTodayIfMissing();
+    scheduleMidnightAutoAdd(); // إعادة الجدولة لليوم التالي
+  }, timeUntilMidnight);
 }
 
 function login() {
@@ -75,13 +129,7 @@ function addNewDay() {
     return;
   }
 
-  const options = {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  };
-  const date = new Date().toLocaleDateString("ar-EG", options);
+  const date = getFormattedDate();
 
   db.collection("task_days")
     .add({
@@ -158,12 +206,7 @@ function renderDay(doc) {
         <div id="list-${dayId}"></div>
         <div class="input-group">
             <input type="text" id="input-${dayId}" placeholder="اكتب مهمة جديدة..." onkeypress="handleKeyPress(event, '${dayId}')">
-            <select id="prio-${dayId}" class="prio-select">
-                <option value="high">🔴 عاجل</option>
-                <option value="med" selected>🟡 متوسط</option>
-                <option value="low">🟢 منخفض</option>
-            </select>
-            <button class="add-task-btn" onclick="addTask('${dayId}')">➕</button>
+            <button class="add-task-btn" onclick="addTask('${dayId}')">➕ إدراج</button>
         </div>
     `;
   container.appendChild(dayCard);
@@ -178,14 +221,12 @@ function handleKeyPress(event, dayId) {
 
 function addTask(dayId) {
   const input = document.getElementById(`input-${dayId}`);
-  const prioSelect = document.getElementById(`prio-${dayId}`);
   const taskText = input.value.trim();
 
   if (taskText && currentUser) {
     db.collection("task_days").doc(dayId).collection("items").add({
       text: taskText,
       done: false,
-      priority: prioSelect.value,
       createdAt: new Date().getTime(),
     });
     input.value = "";
@@ -213,7 +254,7 @@ function loadItems(dayId) {
         if (item.done) doneCount++;
 
         list.innerHTML += `
-                <div class="task-item ${item.done ? "done" : ""} prio-${item.priority || "med"}" data-text="${item.text.toLowerCase()}">
+                <div class="task-item ${item.done ? "done" : ""}" data-text="${item.text.toLowerCase()}">
                     <div style="display:flex; align-items:center; gap:10px; flex:1;">
                         <input type="checkbox" ${item.done ? "checked" : ""} 
                             onclick="toggleTask('${dayId}', '${itemDoc.id}', ${item.done})">
