@@ -1,3 +1,4 @@
+// تهيئة Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAyw4tZH8I85CsBKmdxK7ZYMDCBxDvCgPc",
   authDomain: "task-planner-app-f6e0e.firebaseapp.com",
@@ -21,17 +22,17 @@ let activeListeners = {};
 let globalStats = {};
 let midnightTimer = null;
 
+document.addEventListener("DOMContentLoaded", init);
+
 function init() {
   auth.onAuthStateChanged((user) => {
     const profileDiv = document.getElementById("user-profile");
-    const addDayBtn = document.getElementById("add-day-btn");
     const dashboard = document.getElementById("dashboard-panel");
     const searchBar = document.getElementById("search-container");
     const container = document.getElementById("tasks-container");
 
     if (user) {
       currentUser = user;
-      addDayBtn.style.display = "flex";
       dashboard.style.display = "flex";
       searchBar.style.display = "block";
 
@@ -41,15 +42,14 @@ function init() {
             <button onclick="logout()" class="logout-btn" title="تسجيل الخروج">🚪</button>
         </div>
       `;
-      
-      // التاكد التلقائي من إضافة يوم اليوم + جدولة منتصف الليل
+
+      // إضافة اليوم الحالي فور تسجيل الدخول وحساب التوقيت لـ 12 منتصف الليل
       autoAddTodayIfMissing();
       scheduleMidnightAutoAdd();
 
       loadTasks();
     } else {
       currentUser = null;
-      addDayBtn.style.display = "none";
       dashboard.style.display = "none";
       searchBar.style.display = "none";
       container.innerHTML =
@@ -59,6 +59,20 @@ function init() {
       if (midnightTimer) clearTimeout(midnightTimer);
       Object.keys(activeListeners).forEach((id) => activeListeners[id]());
       activeListeners = {};
+    }
+  });
+
+  // معالجة حالة الـ Sleep أو العودة للـ Tab لتأكيد إضافة اليوم فور الاستيقاظ
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && currentUser) {
+      autoAddTodayIfMissing();
+      scheduleMidnightAutoAdd();
+    }
+  });
+
+  window.addEventListener("focus", () => {
+    if (currentUser) {
+      autoAddTodayIfMissing();
     }
   });
 }
@@ -73,7 +87,7 @@ function getFormattedDate(dateObj = new Date()) {
   return dateObj.toLocaleDateString("ar-EG", options);
 }
 
-// التاكد من وجود اليوم الحالي وإضافته تلقائياً عند فتح التطبيق
+// إضافة يوم اليوم تلقائياً إن لم يكن موجوداً
 function autoAddTodayIfMissing() {
   if (!currentUser) return;
   const todayFormatted = getFormattedDate();
@@ -90,10 +104,11 @@ function autoAddTodayIfMissing() {
           createdAt: new Date().getTime(),
         });
       }
-    });
+    })
+    .catch((err) => console.error("خطأ التثبت من اليوم الحالي:", err));
 }
 
-// جدولة التحديث التلقائي عند حلول 12 منتصف الليل بالضبط
+// جدولة التايمر للعمل بدقة عند الساعة 12:00:01 AM
 function scheduleMidnightAutoAdd() {
   if (midnightTimer) clearTimeout(midnightTimer);
 
@@ -123,26 +138,6 @@ function logout() {
   auth.signOut();
 }
 
-function addNewDay() {
-  if (!currentUser) {
-    Swal.fire("تنبيه", "يجب تسجيل الدخول أولاً لإضافة يوم جديد!", "warning");
-    return;
-  }
-
-  const date = getFormattedDate();
-
-  db.collection("task_days")
-    .add({
-      date: date,
-      userId: currentUser.uid,
-      createdAt: new Date().getTime(),
-    })
-    .catch((err) => {
-      console.error("خطأ أثناء إضافة اليوم:", err);
-      Swal.fire("خطأ في قاعدة البيانات", err.message, "error");
-    });
-}
-
 function loadTasks() {
   const container = document.getElementById("tasks-container");
   if (!container || !currentUser) return;
@@ -153,7 +148,7 @@ function loadTasks() {
     .onSnapshot((snap) => {
       if (snap.empty) {
         container.innerHTML =
-          '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">لا توجد أيام مضافة بعد.</p>';
+          '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">جاري تحميل أو إنشاء اليوم...</p>';
         updateGlobalDashboard();
         return;
       }
@@ -209,7 +204,9 @@ function renderDay(doc) {
             <button class="add-task-btn" onclick="addTask('${dayId}')">➕ إدراج</button>
         </div>
     `;
-  container.appendChild(dayCard);
+  
+  // يوضع اليوم الجديد دائماً في البداية للأعلى
+  container.insertBefore(dayCard, container.firstChild);
   loadItems(dayId);
 }
 
@@ -384,4 +381,8 @@ async function deleteDay(dayId) {
     await db.collection("task_days").doc(dayId).delete();
     Swal.fire("تم!", "تم حذف اليوم بنجاح.", "success");
   }
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
