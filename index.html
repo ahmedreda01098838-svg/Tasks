@@ -4,29 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>منظم المهام اليومية</title>
+    
+    <!-- Preconnect للمكتبات الخارجية لتسريع الاتصال -->
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
     <link rel="stylesheet" href="style.css">
     
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- Canvas Confetti -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <!-- تحميل المكتبات مع تأجيل التنفيذ لتسريع ظهور الصفحة -->
+    <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
 
     <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <!-- Script الرئيسي مع defer -->
+    <script defer src="script.js"></script>
 </head>
 <body>
 
-    <!-- Header Section -->
     <header class="header">
-        <h1>📌Tasks(aamd)</h1>
-        <div class="user-profile" id="user-profile">
-            <!-- سيتم إضافة زر الدخول أو صورة المستخدم هنا عبر JS -->
-        </div>
+        <h1>📌 منظم المهام</h1>
+        <div class="user-profile" id="user-profile"></div>
     </header>
 
-    <!-- Dashboard Panel -->
     <div class="dashboard-panel" id="dashboard-panel" style="display: none;">
         <div class="stat-card">
             <span class="stat-title">إجمالي المهام</span>
@@ -42,19 +45,16 @@
         </div>
     </div>
 
-    <!-- Search Bar -->
     <div class="search-bar-container" id="search-container" style="display: none;">
         <input type="text" id="search-input" placeholder="🔍 ابحث في المهام أو التواريخ..." oninput="filterTasks()">
     </div>
 
-    <!-- Main Content Container -->
     <main class="week-container" id="tasks-container">
-        <!-- سيتم توليد الأيام والمهام هنا تلقائياً -->
+        <!-- مؤشر تحميل سريع لحين تجهيز البيانات -->
+        <p id="loading-spinner" style="text-align:center; color: var(--text-muted); margin-top: 40px;">جاري تحميل المهام...</p>
     </main>
 
-    <!-- Floating Action / Scroll Top Button -->
     <button class="scroll-top-btn" onclick="scrollToTop()" title="للأعلى">⬆</button>
 
-    <script src="script.js"></script>
 </body>
 </html>
