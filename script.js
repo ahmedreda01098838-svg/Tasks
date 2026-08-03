@@ -22,39 +22,51 @@ let activeListeners = {};
 let globalStats = {};
 let midnightTimer = null;
 
-document.addEventListener("DOMContentLoaded", init);
+// تشغيل الـ init عند تحميل الكود مباشرة
+init();
 
 function init() {
   auth.onAuthStateChanged((user) => {
     const profileDiv = document.getElementById("user-profile");
+    const addDayBtn = document.getElementById("add-day-btn");
     const dashboard = document.getElementById("dashboard-panel");
     const searchBar = document.getElementById("search-container");
     const container = document.getElementById("tasks-container");
 
     if (user) {
       currentUser = user;
-      dashboard.style.display = "flex";
-      searchBar.style.display = "block";
+      if (addDayBtn) addDayBtn.style.display = "flex";
+      if (dashboard) dashboard.style.display = "flex";
+      if (searchBar) searchBar.style.display = "block";
 
-      profileDiv.innerHTML = `
-        <div class="user-info">
-            <img src="${user.photoURL}" class="user-avatar" alt="avatar">
-            <button onclick="logout()" class="logout-btn" title="تسجيل الخروج">🚪</button>
-        </div>
-      `;
+      if (profileDiv) {
+        profileDiv.innerHTML = `
+          <div class="user-info">
+              <img src="${user.photoURL}" class="user-avatar" alt="avatar">
+              <button onclick="logout()" class="logout-btn" title="تسجيل الخروج">🚪</button>
+          </div>
+        `;
+      }
 
-      // إضافة اليوم الحالي فور تسجيل الدخول وحساب التوقيت لـ 12 منتصف الليل
+      // إضافة اليوم الحالي تلقائياً عند الدخول
       autoAddTodayIfMissing();
       scheduleMidnightAutoAdd();
 
       loadTasks();
     } else {
       currentUser = null;
-      dashboard.style.display = "none";
-      searchBar.style.display = "none";
-      container.innerHTML =
-        '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">يرجى تسجيل الدخول أولاً لحفظ مهامك سحابياً.</p>';
-      profileDiv.innerHTML = `<button onclick="login()" class="login-btn">🔐 دخول بجوجل</button>`;
+      if (addDayBtn) addDayBtn.style.display = "none";
+      if (dashboard) dashboard.style.display = "none";
+      if (searchBar) searchBar.style.display = "none";
+      
+      if (container) {
+        container.innerHTML =
+          '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">يرجى تسجيل الدخول أولاً لحفظ مهامك سحابياً.</p>';
+      }
+
+      if (profileDiv) {
+        profileDiv.innerHTML = `<button onclick="login()" class="login-btn">🔐 دخول بجوجل</button>`;
+      }
 
       if (midnightTimer) clearTimeout(midnightTimer);
       Object.keys(activeListeners).forEach((id) => activeListeners[id]());
@@ -62,7 +74,6 @@ function init() {
     }
   });
 
-  // معالجة حالة الـ Sleep أو العودة للـ Tab لتأكيد إضافة اليوم فور الاستيقاظ
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && currentUser) {
       autoAddTodayIfMissing();
@@ -87,7 +98,6 @@ function getFormattedDate(dateObj = new Date()) {
   return dateObj.toLocaleDateString("ar-EG", options);
 }
 
-// إضافة يوم اليوم تلقائياً إن لم يكن موجوداً
 function autoAddTodayIfMissing() {
   if (!currentUser) return;
   const todayFormatted = getFormattedDate();
@@ -108,7 +118,6 @@ function autoAddTodayIfMissing() {
     .catch((err) => console.error("خطأ التثبت من اليوم الحالي:", err));
 }
 
-// جدولة التايمر للعمل بدقة عند الساعة 12:00:01 AM
 function scheduleMidnightAutoAdd() {
   if (midnightTimer) clearTimeout(midnightTimer);
 
@@ -123,7 +132,7 @@ function scheduleMidnightAutoAdd() {
 
   midnightTimer = setTimeout(() => {
     autoAddTodayIfMissing();
-    scheduleMidnightAutoAdd(); // إعادة الجدولة لليوم التالي
+    scheduleMidnightAutoAdd();
   }, timeUntilMidnight);
 }
 
@@ -138,6 +147,26 @@ function logout() {
   auth.signOut();
 }
 
+function addNewDay() {
+  if (!currentUser) {
+    Swal.fire("تنبيه", "يجب تسجيل الدخول أولاً لإضافة يوم جديد!", "warning");
+    return;
+  }
+
+  const date = getFormattedDate();
+
+  db.collection("task_days")
+    .add({
+      date: date,
+      userId: currentUser.uid,
+      createdAt: new Date().getTime(),
+    })
+    .catch((err) => {
+      console.error("خطأ أثناء إضافة اليوم:", err);
+      Swal.fire("خطأ في قاعدة البيانات", err.message, "error");
+    });
+}
+
 function loadTasks() {
   const container = document.getElementById("tasks-container");
   if (!container || !currentUser) return;
@@ -148,7 +177,7 @@ function loadTasks() {
     .onSnapshot((snap) => {
       if (snap.empty) {
         container.innerHTML =
-          '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">جاري تحميل أو إنشاء اليوم...</p>';
+          '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">لا توجد أيام مضافة بعد.</p>';
         updateGlobalDashboard();
         return;
       }
@@ -205,8 +234,7 @@ function renderDay(doc) {
         </div>
     `;
   
-  // يوضع اليوم الجديد دائماً في البداية للأعلى
-  container.insertBefore(dayCard, container.firstChild);
+  container.appendChild(dayCard);
   loadItems(dayId);
 }
 
@@ -287,10 +315,13 @@ function updateGlobalDashboard() {
     completed += stat.completed || 0;
   });
 
-  document.getElementById("stat-total").textContent = total;
-  document.getElementById("stat-completed").textContent = completed;
-  document.getElementById("stat-ratio").textContent =
-    total === 0 ? "0%" : Math.round((completed / total) * 100) + "%";
+  const totalEl = document.getElementById("stat-total");
+  const compEl = document.getElementById("stat-completed");
+  const ratioEl = document.getElementById("stat-ratio");
+
+  if (totalEl) totalEl.textContent = total;
+  if (compEl) compEl.textContent = completed;
+  if (ratioEl) ratioEl.textContent = total === 0 ? "0%" : Math.round((completed / total) * 100) + "%";
 }
 
 function toggleTask(dayId, taskId, currentStatus) {
