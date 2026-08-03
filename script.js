@@ -11,7 +11,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// تفعيل العمل بدون إنترنت
+// تفعيل حفظ البيانات أوفلاين
 db.enablePersistence().catch((err) => {
   if (err.code == "failed-precondition")
     console.warn("حسابات متعددة مفتوحة، تم إلغاء التخزين المحلي مؤقتاً.");
