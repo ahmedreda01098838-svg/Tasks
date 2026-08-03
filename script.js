@@ -19,11 +19,10 @@ db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
 
 let currentUser = null;
 let activeListeners = {};
-let globalStats = {};
 let midnightTimer = null;
 
-let lastVisibleDoc = null; // يحفظ آخر يوم تم تحميله للبدء منه في التحميل القادم
-const PAGE_SIZE = 10;      // عدد الأيام في كل دفعة
+let lastVisibleDoc = null; 
+const PAGE_SIZE = 10;      
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -52,6 +51,7 @@ function init() {
       autoAddTodayIfMissing();
       scheduleMidnightAutoAdd();
       loadInitialTasks();
+      calculateAllTimeStats(); // 👈 حساب إجمالي جميع المهام لجميع الأيام
     } else {
       currentUser = null;
       if (dashboard) dashboard.style.display = "none";
@@ -104,7 +104,7 @@ function autoAddTodayIfMissing() {
           date: todayFormatted,
           userId: currentUser.uid,
           createdAt: Date.now(),
-        });
+        }).then(() => calculateAllTimeStats());
       }
     })
     .catch((err) => console.error("خطأ التثبت من اليوم الحالي:", err));
@@ -137,7 +137,47 @@ function logout() {
   auth.signOut();
 }
 
-// تحميل أول دفعة من الأيام (الأحدث)
+// 🎯 دالة جديدة لحساب إجمالي المهام والمهام المكتملة لكامل الحساب دون الاستثناء
+async function calculateAllTimeStats() {
+  if (!currentUser) return;
+
+  try {
+    const daysSnap = await db.collection("task_days")
+      .where("userId", "==", currentUser.uid)
+      .get();
+
+    let totalTasks = 0;
+    let completedTasks = 0;
+
+    const promises = daysSnap.docs.map(doc => 
+      db.collection("task_days").doc(doc.id).collection("items").get()
+    );
+
+    const itemsSnapshots = await Promise.all(promises);
+
+    itemsSnapshots.forEach(snap => {
+      snap.forEach(itemDoc => {
+        totalTasks++;
+        if (itemDoc.data().done) {
+          completedTasks++;
+        }
+      });
+    });
+
+    const totalEl = document.getElementById("stat-total");
+    const compEl = document.getElementById("stat-completed");
+    const ratioEl = document.getElementById("stat-ratio");
+
+    if (totalEl) totalEl.textContent = totalTasks;
+    if (compEl) compEl.textContent = completedTasks;
+    if (ratioEl) ratioEl.textContent = totalTasks === 0 ? "0%" : Math.round((completedTasks / totalTasks) * 100) + "%";
+
+  } catch (err) {
+    console.error("خطأ في حساب الإحصائيات الشاملة:", err);
+  }
+}
+
+// تحميل أول 10 أيام للأداء السريع
 function loadInitialTasks() {
   const container = document.getElementById("tasks-container");
   const loadMoreBtn = document.getElementById("load-more-btn");
@@ -154,14 +194,12 @@ function loadInitialTasks() {
       if (snap.empty) {
         container.innerHTML =
           '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">لا توجد أيام مضافة بعد.</p>';
-        updateGlobalDashboard();
         if (loadMoreBtn) loadMoreBtn.style.display = "none";
         return;
       }
 
       lastVisibleDoc = snap.docs[snap.docs.length - 1];
 
-      // إظهار زر تحميل المزيد لو عدد الأيام بيساوي الحد الأقصى للدفعة
       if (loadMoreBtn) {
         loadMoreBtn.style.display = snap.docs.length >= PAGE_SIZE ? "block" : "none";
       }
@@ -181,14 +219,12 @@ function loadInitialTasks() {
             activeListeners[dayId]();
             delete activeListeners[dayId];
           }
-          delete globalStats[dayId];
-          updateGlobalDashboard();
+          calculateAllTimeStats();
         }
       });
     });
 }
 
-// تحميل الدفعة التالية (الأيام الأقدم) عند الضغط على الزر
 function loadMoreTasks() {
   if (!lastVisibleDoc || !currentUser) return;
 
@@ -210,7 +246,7 @@ function loadMoreTasks() {
       lastVisibleDoc = snap.docs[snap.docs.length - 1];
 
       snap.docs.forEach((doc) => {
-        renderDay(doc, -1); // -1 تعني إضافته في القاع (تحت خالص)
+        renderDay(doc, -1);
       });
 
       if (loadMoreBtn) {
@@ -273,6 +309,8 @@ function addTask(dayId) {
       text: taskText,
       done: false,
       createdAt: Date.now(),
+    }).then(() => {
+      calculateAllTimeStats(); // تحديث الإحصائيات العامة
     });
     input.value = "";
   }
@@ -319,37 +357,22 @@ function loadItems(dayId) {
       const progress = snap.size > 0 ? (doneCount / snap.size) * 100 : 0;
       bar.style.width = progress + "%";
 
-      if (progress === 100 && snap.size > 0 && globalStats[dayId]?.completed !== doneCount) {
+      if (progress === 100 && snap.size > 0) {
         if (typeof confetti === "function") {
           confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
         }
       }
-
-      globalStats[dayId] = { total: snap.size, completed: doneCount };
-      updateGlobalDashboard();
     });
 
   activeListeners[dayId] = unsubscribe;
 }
 
-function updateGlobalDashboard() {
-  let total = 0, completed = 0;
-  Object.values(globalStats).forEach((stat) => {
-    total += stat.total || 0;
-    completed += stat.completed || 0;
-  });
-
-  const totalEl = document.getElementById("stat-total");
-  const compEl = document.getElementById("stat-completed");
-  const ratioEl = document.getElementById("stat-ratio");
-
-  if (totalEl) totalEl.textContent = total;
-  if (compEl) compEl.textContent = completed;
-  if (ratioEl) ratioEl.textContent = total === 0 ? "0%" : Math.round((completed / total) * 100) + "%";
-}
-
 function toggleTask(dayId, taskId, currentStatus) {
-  db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ done: !currentStatus });
+  db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ 
+    done: !currentStatus 
+  }).then(() => {
+    calculateAllTimeStats(); // تحديث الإحصائيات العامة عند تغيير حالة المهمة
+  });
 }
 
 async function editTask(dayId, taskId, currentText) {
@@ -368,7 +391,9 @@ async function editTask(dayId, taskId, currentText) {
 }
 
 function deleteSingleTask(dayId, taskId) {
-  db.collection("task_days").doc(dayId).collection("items").doc(taskId).delete();
+  db.collection("task_days").doc(dayId).collection("items").doc(taskId).delete().then(() => {
+    calculateAllTimeStats(); // تحديث الإحصائيات العامة عند مسح مهمة
+  });
 }
 
 function filterTasks() {
@@ -412,6 +437,7 @@ async function deleteDay(dayId) {
     items.forEach((i) => batch.delete(i.ref));
     await batch.commit();
     await db.collection("task_days").doc(dayId).delete();
+    calculateAllTimeStats(); // تحديث الإحصائيات بعد مسح اليوم بالكامل
     Swal.fire("تم!", "تم حذف اليوم بنجاح.", "success");
   }
 }
