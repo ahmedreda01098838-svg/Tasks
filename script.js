@@ -1,4 +1,3 @@
-// تهيئة Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAyw4tZH8I85CsBKmdxK7ZYMDCBxDvCgPc",
   authDomain: "task-planner-app-f6e0e.firebaseapp.com",
@@ -12,9 +11,13 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-db.enablePersistence().catch((err) => {
-  if (err.code == "failed-precondition")
-    console.warn("حسابات متعددة مفتوحة، تم إلغاء التخزين المحلي مؤقتاً.");
+// تفعيل الكاش المحلي لفتح البيانات فوراً بدون انتظار الإنترنت
+db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+  if (err.code === "failed-precondition") {
+    console.warn("التخزين المحلي يعمل في تبويب آخر.");
+  } else if (err.code === "unimplemented") {
+    console.warn("المتصفح لا يدعم التخزين المحلي.");
+  }
 });
 
 let currentUser = null;
@@ -22,8 +25,7 @@ let activeListeners = {};
 let globalStats = {};
 let midnightTimer = null;
 
-// تشغيل init عند تحميل الكود
-init();
+document.addEventListener("DOMContentLoaded", init);
 
 function init() {
   auth.onAuthStateChanged((user) => {
@@ -40,17 +42,14 @@ function init() {
       if (profileDiv) {
         profileDiv.innerHTML = `
           <div class="user-info">
-              <img src="${user.photoURL}" class="user-avatar" alt="avatar">
+              <img src="${user.photoURL}" class="user-avatar" alt="avatar" loading="lazy">
               <button onclick="logout()" class="logout-btn" title="تسجيل الخروج">🚪</button>
           </div>
         `;
       }
 
-      // إضافة اليوم الحالي تلقائياً عند الدخول
       autoAddTodayIfMissing();
-      // جدولة الإضافة التلقائية عند الساعة 12 منتصف الليل
       scheduleMidnightAutoAdd();
-
       loadTasks();
     } else {
       currentUser = null;
@@ -78,22 +77,15 @@ function init() {
       scheduleMidnightAutoAdd();
     }
   });
-
-  window.addEventListener("focus", () => {
-    if (currentUser) {
-      autoAddTodayIfMissing();
-    }
-  });
 }
 
 function getFormattedDate(dateObj = new Date()) {
-  const options = {
+  return dateObj.toLocaleDateString("ar-EG", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
-  };
-  return dateObj.toLocaleDateString("ar-EG", options);
+  });
 }
 
 function autoAddTodayIfMissing() {
@@ -103,13 +95,13 @@ function autoAddTodayIfMissing() {
   db.collection("task_days")
     .where("userId", "==", currentUser.uid)
     .where("date", "==", todayFormatted)
-    .get()
+    .get({ source: "default" })
     .then((snapshot) => {
       if (snapshot.empty) {
         db.collection("task_days").add({
           date: todayFormatted,
           userId: currentUser.uid,
-          createdAt: new Date().getTime(),
+          createdAt: Date.now(),
         });
       }
     })
@@ -136,9 +128,7 @@ function scheduleMidnightAutoAdd() {
 
 function login() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  auth
-    .signInWithPopup(provider)
-    .catch((err) => Swal.fire("خطأ", err.message, "error"));
+  auth.signInWithPopup(provider).catch((err) => Swal.fire("خطأ", err.message, "error"));
 }
 
 function logout() {
@@ -149,34 +139,29 @@ function loadTasks() {
   const container = document.getElementById("tasks-container");
   if (!container || !currentUser) return;
 
-  let isInitialLoad = true;
-
+  // جلب آخر 15 يوم فقط لتخفيف الحمل وسرعة الاستجابة
   db.collection("task_days")
     .where("userId", "==", currentUser.uid)
     .orderBy("createdAt", "desc")
-    .onSnapshot((snap) => {
+    .limit(15)
+    .onSnapshot({ includeMetadataChanges: true }, (snap) => {
+      const loadingSpinner = document.getElementById("loading-spinner");
+      if (loadingSpinner) loadingSpinner.remove();
+
       if (snap.empty) {
         container.innerHTML =
           '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">لا توجد أيام مضافة بعد.</p>';
         updateGlobalDashboard();
-        isInitialLoad = false;
         return;
       }
 
       snap.docChanges().forEach((change) => {
         const dayId = change.doc.id;
+        
         if (change.type === "added") {
-          if (
-            container.firstElementChild &&
-            container.firstElementChild.tagName === "P"
-          )
-            container.innerHTML = "";
-          
-          renderDay(change.doc, !isInitialLoad);
+          renderDay(change.doc, change.newIndex);
         } else if (change.type === "modified") {
-          const titleElement = document.querySelector(
-            `#card-${dayId} .day-header h3`
-          );
+          const titleElement = document.querySelector(`#card-${dayId} .day-header h3`);
           if (titleElement) titleElement.textContent = `📅 ${change.doc.data().date}`;
         } else if (change.type === "removed") {
           const card = document.getElementById(`card-${dayId}`);
@@ -189,11 +174,12 @@ function loadTasks() {
           updateGlobalDashboard();
         }
       });
-      isInitialLoad = false;
+    }, (error) => {
+      console.error("Firebase Error:", error);
     });
 }
 
-function renderDay(doc, shouldPrepend = false) {
+function renderDay(doc, targetIndex) {
   const dayId = doc.id;
   const data = doc.data();
   const container = document.getElementById("tasks-container");
@@ -218,20 +204,19 @@ function renderDay(doc, shouldPrepend = false) {
             <button class="add-task-btn" onclick="addTask('${dayId}')">➕ إدراج</button>
         </div>
     `;
-  
-  if (shouldPrepend && container.firstChild) {
-    container.insertBefore(dayCard, container.firstChild);
-  } else {
+
+  const existingChildren = container.children;
+  if (targetIndex >= existingChildren.length) {
     container.appendChild(dayCard);
+  } else {
+    container.insertBefore(dayCard, existingChildren[targetIndex]);
   }
 
   loadItems(dayId);
 }
 
 function handleKeyPress(event, dayId) {
-  if (event.key === "Enter") {
-    addTask(dayId);
-  }
+  if (event.key === "Enter") addTask(dayId);
 }
 
 function addTask(dayId) {
@@ -242,7 +227,7 @@ function addTask(dayId) {
     db.collection("task_days").doc(dayId).collection("items").add({
       text: taskText,
       done: false,
-      createdAt: new Date().getTime(),
+      createdAt: Date.now(),
     });
     input.value = "";
   }
@@ -261,45 +246,49 @@ function loadItems(dayId) {
       const bar = document.getElementById(`bar-${dayId}`);
       if (!list || !bar) return;
 
-      list.innerHTML = "";
+      const fragment = document.createDocumentFragment();
       let doneCount = 0;
 
       snap.forEach((itemDoc) => {
         const item = itemDoc.data();
         if (item.done) doneCount++;
 
-        list.innerHTML += `
-                <div class="task-item ${item.done ? "done" : ""}" data-text="${item.text.toLowerCase()}">
-                    <div style="display:flex; align-items:center; gap:10px; flex:1;">
-                        <input type="checkbox" ${item.done ? "checked" : ""} 
-                            onclick="toggleTask('${dayId}', '${itemDoc.id}', ${item.done})">
-                        <span class="task-text" onclick="editTask('${dayId}', '${itemDoc.id}', '${item.text}')">${item.text}</span>
-                    </div>
-                    <button class="edit-task-btn" onclick="editTask('${dayId}', '${itemDoc.id}', '${item.text}')">✏️</button>
-                    <button class="delete-task-btn" onclick="deleteSingleTask('${dayId}', '${itemDoc.id}')">✖</button>
-                </div>`;
+        const itemDiv = document.createElement("div");
+        itemDiv.className = `task-item ${item.done ? "done" : ""}`;
+        itemDiv.setAttribute("data-text", item.text.toLowerCase());
+        itemDiv.innerHTML = `
+            <div style="display:flex; align-items:center; gap:10px; flex:1;">
+                <input type="checkbox" ${item.done ? "checked" : ""} 
+                    onclick="toggleTask('${dayId}', '${itemDoc.id}', ${item.done})">
+                <span class="task-text" onclick="editTask('${dayId}', '${itemDoc.id}', '${item.text.replace(/'/g, "\\'")}')">${item.text}</span>
+            </div>
+            <button class="edit-task-btn" onclick="editTask('${dayId}', '${itemDoc.id}', '${item.text.replace(/'/g, "\\'")}')">✏️</button>
+            <button class="delete-task-btn" onclick="deleteSingleTask('${dayId}', '${itemDoc.id}')">✖</button>
+        `;
+        fragment.appendChild(itemDiv);
       });
+
+      list.innerHTML = "";
+      list.appendChild(fragment);
 
       const progress = snap.size > 0 ? (doneCount / snap.size) * 100 : 0;
       bar.style.width = progress + "%";
 
-      if (
-        progress === 100 &&
-        snap.size > 0 &&
-        globalStats[dayId]?.completed !== doneCount
-      ) {
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      if (progress === 100 && snap.size > 0 && globalStats[dayId]?.completed !== doneCount) {
+        if (typeof confetti === "function") {
+          confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+        }
       }
 
       globalStats[dayId] = { total: snap.size, completed: doneCount };
       updateGlobalDashboard();
     });
+
   activeListeners[dayId] = unsubscribe;
 }
 
 function updateGlobalDashboard() {
-  let total = 0,
-    completed = 0;
+  let total = 0, completed = 0;
   Object.values(globalStats).forEach((stat) => {
     total += stat.total || 0;
     completed += stat.completed || 0;
@@ -315,11 +304,7 @@ function updateGlobalDashboard() {
 }
 
 function toggleTask(dayId, taskId, currentStatus) {
-  db.collection("task_days")
-    .doc(dayId)
-    .collection("items")
-    .doc(taskId)
-    .update({ done: !currentStatus });
+  db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ done: !currentStatus });
 }
 
 async function editTask(dayId, taskId, currentText) {
@@ -333,20 +318,12 @@ async function editTask(dayId, taskId, currentText) {
   });
 
   if (newText && newText.trim() !== currentText) {
-    db.collection("task_days")
-      .doc(dayId)
-      .collection("items")
-      .doc(taskId)
-      .update({ text: newText.trim() });
+    db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ text: newText.trim() });
   }
 }
 
 function deleteSingleTask(dayId, taskId) {
-  db.collection("task_days")
-    .doc(dayId)
-    .collection("items")
-    .doc(taskId)
-    .delete();
+  db.collection("task_days").doc(dayId).collection("items").doc(taskId).delete();
 }
 
 function filterTasks() {
@@ -355,14 +332,8 @@ function filterTasks() {
 
   cards.forEach((card) => {
     const tasks = card.querySelectorAll(".task-item");
-    const dateText = card
-      .querySelector(".day-header h3")
-      .textContent.toLowerCase();
-    let matches = false;
-
-    if (dateText.includes(query)) {
-      matches = true;
-    }
+    const dateText = card.querySelector(".day-header h3").textContent.toLowerCase();
+    let matches = dateText.includes(query);
 
     tasks.forEach((task) => {
       const text = task.getAttribute("data-text");
@@ -391,11 +362,7 @@ async function deleteDay(dayId) {
   });
 
   if (result.isConfirmed) {
-    const items = await db
-      .collection("task_days")
-      .doc(dayId)
-      .collection("items")
-      .get();
+    const items = await db.collection("task_days").doc(dayId).collection("items").get();
     const batch = db.batch();
     items.forEach((i) => batch.delete(i.ref));
     await batch.commit();
