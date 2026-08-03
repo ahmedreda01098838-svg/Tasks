@@ -69,7 +69,7 @@ body {
   box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
 }
 
-/* أزرار العامة */
+/* الأزرار العامة */
 button {
   cursor: pointer;
   border: none;
@@ -221,7 +221,7 @@ button {
   border-radius: 10px;
 }
 
-/* كارت المهمة Individual Task Item */
+/* كارت المهمة */
 .task-item {
   display: flex;
   align-items: center;
@@ -247,7 +247,7 @@ button {
   opacity: 0.45;
 }
 
-.task-item.done span {
+.task-item.done .task-text {
   text-decoration: line-through;
   color: var(--text-muted);
 }
@@ -256,6 +256,11 @@ button {
   flex: 1;
   cursor: pointer;
   font-size: 0.95rem;
+}
+
+.task-actions {
+  display: flex;
+  gap: 4px;
 }
 
 /* أدوات الإدخال داخل الكارت */
