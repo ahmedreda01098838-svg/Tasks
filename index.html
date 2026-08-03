@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Planner</title>
+    <title>Task Planner (aamd)</title>
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1a252f">
+    <meta name="theme-color" content="#0f172a">
     <link rel="stylesheet" href="style.css">
     
     <!-- مكتبات Firebase Compat -->
@@ -21,6 +21,7 @@
 </head>
 <body onload="init()">
 
+    <!-- الهيدر العلوي -->
     <div class="header">
         <div class="user-profile" id="user-profile">
             <button onclick="login()" class="login-btn">🔐 دخول بجوجل</button>
@@ -29,6 +30,7 @@
         <button onclick="addNewDay()" class="add-day-btn" id="add-day-btn" style="display: none;">➕ إضافة يوم جديد</button>
     </div>
 
+    <!-- لوحة الإحصائيات العامة -->
     <div class="dashboard-panel" id="dashboard-panel" style="display: none;">
         <div class="stat-card">
             <span class="stat-title">المهام المكتملة</span>
@@ -44,11 +46,18 @@
         </div>
     </div>
 
+    <!-- شريط البحث والفلترة -->
     <div class="search-bar-container" id="search-container" style="display: none;">
         <input type="text" id="search-input" oninput="filterTasks()" placeholder="🔍 ابحث عن مهمة أو تاريخ معين...">
     </div>
 
+    <!-- حاوية الأيام والمهام -->
     <div id="tasks-container" class="week-container"></div>
+
+    <!-- زر التمرير السريع للأعلى -->
+    <button id="scrollToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="scroll-top-btn" title="صعود للأعلى">
+      ⬆️
+    </button>
 
     <script src="script.js"></script>
 </body>
