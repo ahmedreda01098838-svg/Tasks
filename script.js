@@ -22,20 +22,18 @@ let activeListeners = {};
 let globalStats = {};
 let midnightTimer = null;
 
-// تشغيل الـ init عند تحميل الكود مباشرة
+// تشغيل init عند تحميل الكود
 init();
 
 function init() {
   auth.onAuthStateChanged((user) => {
     const profileDiv = document.getElementById("user-profile");
-    const addDayBtn = document.getElementById("add-day-btn");
     const dashboard = document.getElementById("dashboard-panel");
     const searchBar = document.getElementById("search-container");
     const container = document.getElementById("tasks-container");
 
     if (user) {
       currentUser = user;
-      if (addDayBtn) addDayBtn.style.display = "flex";
       if (dashboard) dashboard.style.display = "flex";
       if (searchBar) searchBar.style.display = "block";
 
@@ -50,12 +48,12 @@ function init() {
 
       // إضافة اليوم الحالي تلقائياً عند الدخول
       autoAddTodayIfMissing();
+      // جدولة الإضافة التلقائية عند الساعة 12 منتصف الليل
       scheduleMidnightAutoAdd();
 
       loadTasks();
     } else {
       currentUser = null;
-      if (addDayBtn) addDayBtn.style.display = "none";
       if (dashboard) dashboard.style.display = "none";
       if (searchBar) searchBar.style.display = "none";
       
@@ -147,29 +145,11 @@ function logout() {
   auth.signOut();
 }
 
-function addNewDay() {
-  if (!currentUser) {
-    Swal.fire("تنبيه", "يجب تسجيل الدخول أولاً لإضافة يوم جديد!", "warning");
-    return;
-  }
-
-  const date = getFormattedDate();
-
-  db.collection("task_days")
-    .add({
-      date: date,
-      userId: currentUser.uid,
-      createdAt: new Date().getTime(),
-    })
-    .catch((err) => {
-      console.error("خطأ أثناء إضافة اليوم:", err);
-      Swal.fire("خطأ في قاعدة البيانات", err.message, "error");
-    });
-}
-
 function loadTasks() {
   const container = document.getElementById("tasks-container");
   if (!container || !currentUser) return;
+
+  let isInitialLoad = true;
 
   db.collection("task_days")
     .where("userId", "==", currentUser.uid)
@@ -179,6 +159,7 @@ function loadTasks() {
         container.innerHTML =
           '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">لا توجد أيام مضافة بعد.</p>';
         updateGlobalDashboard();
+        isInitialLoad = false;
         return;
       }
 
@@ -190,7 +171,8 @@ function loadTasks() {
             container.firstElementChild.tagName === "P"
           )
             container.innerHTML = "";
-          renderDay(change.doc);
+          
+          renderDay(change.doc, !isInitialLoad);
         } else if (change.type === "modified") {
           const titleElement = document.querySelector(
             `#card-${dayId} .day-header h3`
@@ -207,13 +189,16 @@ function loadTasks() {
           updateGlobalDashboard();
         }
       });
+      isInitialLoad = false;
     });
 }
 
-function renderDay(doc) {
+function renderDay(doc, shouldPrepend = false) {
   const dayId = doc.id;
   const data = doc.data();
   const container = document.getElementById("tasks-container");
+
+  if (document.getElementById(`card-${dayId}`)) return;
 
   const dayCard = document.createElement("div");
   dayCard.className = "day-card";
@@ -234,7 +219,12 @@ function renderDay(doc) {
         </div>
     `;
   
-  container.appendChild(dayCard);
+  if (shouldPrepend && container.firstChild) {
+    container.insertBefore(dayCard, container.firstChild);
+  } else {
+    container.appendChild(dayCard);
+  }
+
   loadItems(dayId);
 }
 
