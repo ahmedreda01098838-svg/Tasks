@@ -2,14 +2,14 @@
   --primary: #6366f1;
   --primary-hover: #4f46e5;
   --bg: #0f172a;
-  --card-bg: rgba(30, 41, 59, 0.7);
-  --card-hover: rgba(51, 65, 85, 0.8);
+  --card-bg: rgba(30, 41, 59, 0.75);
+  --card-hover: rgba(51, 65, 85, 0.85);
   --success: #10b981;
   --danger: #ef4444;
   --warning: #f59e0b;
   --text: #f8fafc;
   --text-muted: #94a3b8;
-  --border-color: rgba(255, 255, 255, 0.08);
+  --border-color: rgba(255, 255, 255, 0.1);
   --shadow-glow: 0 12px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
@@ -20,15 +20,24 @@
   transition: all 0.25s ease-out;
 }
 
+/* خلفية سينمائية متحركة (Gradient Mesh Animation) */
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: radial-gradient(circle at top right, #1e1b4b, #0f172a 80%);
+  background: linear-gradient(-45deg, #0f172a, #1e1b4b, #111827, #0284c7);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
   color: var(--text);
   min-height: 100vh;
   padding: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 /* الهيدر العلوي */
@@ -40,30 +49,37 @@ body {
   max-width: 700px;
   margin-bottom: 25px;
   background: var(--card-bg);
-  backdrop-filter: blur(12px);
-  padding: 15px 20px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 16px 22px;
   border-radius: 16px;
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-glow);
 }
 
 .header h1 {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 700;
   background: linear-gradient(135deg, #a5b4fc, #6366f1);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.user-info {
+.user-profile {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .user-avatar {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 2px solid var(--primary);
   box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
@@ -109,6 +125,7 @@ button {
   color: var(--danger);
   padding: 8px 12px;
   border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
 }
 
 .logout-btn:hover {
@@ -129,6 +146,7 @@ button {
 .stat-card {
   background: var(--card-bg);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   flex: 1;
   padding: 16px;
   border-radius: 14px;
@@ -164,6 +182,7 @@ button {
   border: 1px solid var(--border-color);
   background: var(--card-bg);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: white;
   font-size: 0.95rem;
   outline: none;
@@ -174,7 +193,7 @@ button {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
 }
 
-/* قائمة الأيام والمهام */
+/* حاوية الأيام والمهام */
 .week-container {
   width: 100%;
   max-width: 700px;
@@ -185,13 +204,22 @@ button {
 
 .day-card {
   background: var(--card-bg);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-radius: 16px;
   padding: 20px;
   border: 1px solid var(--border-color);
   border-right: 5px solid var(--primary);
   box-shadow: var(--shadow-glow);
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* تأثير التكبير والإضاءة عند وقوف الماوس على كارت اليوم */
+.day-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 35px rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.5);
 }
 
 .day-header {
@@ -221,7 +249,7 @@ button {
   border-radius: 10px;
 }
 
-/* كارت المهمة */
+/* عناصر المهام Individual Task Items */
 .task-item {
   display: flex;
   align-items: center;
@@ -232,11 +260,12 @@ button {
   border-radius: 10px;
   border: 1px solid var(--border-color);
   gap: 10px;
+  transition: transform 0.2s ease, background-color 0.2s ease;
 }
 
 .task-item:hover {
-  background: var(--card-hover);
-  transform: translateX(-3px);
+  transform: scale(1.01) translateX(-4px);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .task-item.prio-high { border-right: 4px solid var(--danger); }
@@ -256,11 +285,6 @@ button {
   flex: 1;
   cursor: pointer;
   font-size: 0.95rem;
-}
-
-.task-actions {
-  display: flex;
-  gap: 4px;
 }
 
 /* أدوات الإدخال داخل الكارت */
@@ -319,6 +343,51 @@ button {
 .edit-task-btn:hover {
   background: rgba(99, 102, 241, 0.1);
   border-radius: 6px;
+}
+
+/* زر الصعود للأعلى العائم */
+.scroll-top-btn {
+  position: fixed;
+  bottom: 25px;
+  left: 25px;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scroll-top-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  background: var(--primary);
+}
+
+/* شريط التمرير المخصص Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6366f1;
 }
 
 @keyframes fadeIn {
