@@ -19,7 +19,7 @@ db.enablePersistence().catch((err) => {
 
 let currentUser = null;
 let activeListeners = {};
-let globalStats = { total: 0, completed: 0 };
+let globalStats = {};
 
 // دالة البدء ومراقبة حالة تسجيل الدخول
 function init() {
@@ -32,16 +32,16 @@ function init() {
 
     if (user) {
       currentUser = user;
-      addDayBtn.style.display = "block";
+      addDayBtn.style.display = "flex";
       dashboard.style.display = "flex";
       searchBar.style.display = "block";
 
       profileDiv.innerHTML = `
-                <div class="user-info">
-                    <img src="${user.photoURL}" class="user-avatar" alt="avatar">
-                    <button onclick="logout()" class="logout-btn" title="تسجيل الخروج">🚪</button>
-                </div>
-            `;
+        <div class="user-info">
+            <img src="${user.photoURL}" class="user-avatar" alt="avatar">
+            <button onclick="logout()" class="logout-btn" title="تسجيل الخروج">🚪</button>
+        </div>
+      `;
       loadTasks();
     } else {
       currentUser = null;
@@ -49,7 +49,7 @@ function init() {
       dashboard.style.display = "none";
       searchBar.style.display = "none";
       container.innerHTML =
-        '<p style="text-align:center; color: var(--text);">يرجى تسجيل الدخول أولاً لحفظ مهامك سحابياً.</p>';
+        '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">يرجى تسجيل الدخول أولاً لحفظ مهامك سحابياً.</p>';
       profileDiv.innerHTML = `<button onclick="login()" class="login-btn">🔐 دخول بجوجل</button>`;
 
       Object.keys(activeListeners).forEach((id) => activeListeners[id]());
@@ -69,7 +69,6 @@ function logout() {
   auth.signOut();
 }
 
-// إضافة يوم جديد (تم تعديلها هنا لتعمل فوراً وتتجنب مشاكل السيرفر)
 function addNewDay() {
   if (!currentUser) {
     Swal.fire("تنبيه", "يجب تسجيل الدخول أولاً لإضافة يوم جديد!", "warning");
@@ -88,10 +87,7 @@ function addNewDay() {
     .add({
       date: date,
       userId: currentUser.uid,
-      createdAt: new Date().getTime(), // التعديل: استخدام الملي ثانية للترتيب السريع والمباشر
-    })
-    .then(() => {
-      console.log("تم إضافة اليوم بنجاح!");
+      createdAt: new Date().getTime(),
     })
     .catch((err) => {
       console.error("خطأ أثناء إضافة اليوم:", err);
@@ -105,11 +101,11 @@ function loadTasks() {
 
   db.collection("task_days")
     .where("userId", "==", currentUser.uid)
-    .orderBy("createdAt", "desc") // ترتيب تصاعدي أو تنازلي بناءً على الوقت الملي ثانية الجديد
+    .orderBy("createdAt", "desc")
     .onSnapshot((snap) => {
       if (snap.empty) {
         container.innerHTML =
-          '<p style="text-align:center; color: var(--text);">لا توجد أيام مضافة بعد.</p>';
+          '<p style="text-align:center; color: var(--text-muted); margin-top: 40px;">لا توجد أيام مضافة بعد.</p>';
         updateGlobalDashboard();
         return;
       }
@@ -125,9 +121,9 @@ function loadTasks() {
           renderDay(change.doc);
         } else if (change.type === "modified") {
           const titleElement = document.querySelector(
-            `#card-${dayId} .day-header h3`,
+            `#card-${dayId} .day-header h3`
           );
-          if (titleElement) titleElement.textContent = change.doc.data().date;
+          if (titleElement) titleElement.textContent = `📅 ${change.doc.data().date}`;
         } else if (change.type === "removed") {
           const card = document.getElementById(`card-${dayId}`);
           if (card) card.remove();
@@ -153,7 +149,7 @@ function renderDay(doc) {
 
   dayCard.innerHTML = `
         <div class="day-header">
-            <h3>${data.date}</h3>
+            <h3>📅 ${data.date}</h3>
             <button class="delete-btn" onclick="deleteDay('${dayId}')">🗑️</button>
         </div>
         <div class="progress-container">
@@ -161,7 +157,7 @@ function renderDay(doc) {
         </div>
         <div id="list-${dayId}"></div>
         <div class="input-group">
-            <input type="text" id="input-${dayId}" placeholder="اكتب مهمة جديدة...">
+            <input type="text" id="input-${dayId}" placeholder="اكتب مهمة جديدة..." onkeypress="handleKeyPress(event, '${dayId}')">
             <select id="prio-${dayId}" class="prio-select">
                 <option value="high">🔴 عاجل</option>
                 <option value="med" selected>🟡 متوسط</option>
@@ -174,6 +170,12 @@ function renderDay(doc) {
   loadItems(dayId);
 }
 
+function handleKeyPress(event, dayId) {
+  if (event.key === "Enter") {
+    addTask(dayId);
+  }
+}
+
 function addTask(dayId) {
   const input = document.getElementById(`input-${dayId}`);
   const prioSelect = document.getElementById(`prio-${dayId}`);
@@ -184,7 +186,7 @@ function addTask(dayId) {
       text: taskText,
       done: false,
       priority: prioSelect.value,
-      createdAt: new Date().getTime(), // التعديل لضمان المزامنة الفورية للمهمة أيضاً
+      createdAt: new Date().getTime(),
     });
     input.value = "";
   }
@@ -324,7 +326,7 @@ async function deleteDay(dayId) {
     text: "سيتم مسح جميع المهام المسجلة في هذا اليوم!",
     icon: "warning",
     showCancelButton: true,
-    confirmButtonColor: "#e74c3c",
+    confirmButtonColor: "#ef4444",
     confirmButtonText: "نعم، حذف",
     cancelButtonText: "إلغاء",
   });
