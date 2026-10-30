@@ -22,14 +22,14 @@ let midnightTimer = null;
 let lastVisibleDoc = null; 
 const PAGE_SIZE = 10; 
 
-let trackedKeywords = ["قران", "قرآن", "ذاكرت", "مذاكرة", "تمارين", "جيم"];
+let trackedKeywords = [];
 let recurringTasksList = [];
 
 // Timer / Pomodoro States
 let timerSeconds = 0;
 let timerInterval = null;
 let isTimerRunning = false;
-let timerMode = 'stopwatch'; // 'stopwatch' or 'pomodoro'
+let timerMode = 'stopwatch';
 
 document.addEventListener("DOMContentLoaded", () => {
     initApp();
@@ -67,7 +67,7 @@ function initApp() {
                 `;
             }
 
-            fetchRecurringTasks();
+            fetchUserDataSettings();
             fetchStudyStats();
             autoAddTodayIfMissing();
             scheduleMidnightAutoAdd();
@@ -197,20 +197,30 @@ function playNotificationAudio() {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
     osc.type = "sine";
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5 note
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
     osc.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.3);
 }
 
-// --- Recurring Tasks Manager ---
-async function fetchRecurringTasks() {
+// --- Fetch User Settings & Trackers ---
+async function fetchUserDataSettings() {
     if (!currentUser) return;
     const doc = await db.collection("user_settings").doc(currentUser.uid).get();
-    if (doc.exists && doc.data().recurringTasks) {
-        recurringTasksList = doc.data().recurringTasks;
+    if (doc.exists) {
+        const data = doc.data();
+        if (data.recurringTasks) recurringTasksList = data.recurringTasks;
+        if (data.trackedKeywords) trackedKeywords = data.trackedKeywords;
         renderRecurringChips();
     }
+}
+
+async function saveUserSettings() {
+    if (!currentUser) return;
+    await db.collection("user_settings").doc(currentUser.uid).set({
+        recurringTasks: recurringTasksList,
+        trackedKeywords: trackedKeywords
+    }, { merge: true });
 }
 
 async function addRecurringTask() {
@@ -218,8 +228,8 @@ async function addRecurringTask() {
     const val = input.value.trim();
     if (val && !recurringTasksList.includes(val) && currentUser) {
         recurringTasksList.push(val);
-        await db.collection("user_settings").doc(currentUser.uid).set({ recurringTasks: recurringTasksList }, { merge: true });
         input.value = "";
+        await saveUserSettings();
         renderRecurringChips();
     }
 }
@@ -238,13 +248,37 @@ function renderRecurringChips() {
 
 async function removeRecurringTask(idx) {
     recurringTasksList.splice(idx, 1);
-    await db.collection("user_settings").doc(currentUser.uid).set({ recurringTasks: recurringTasksList }, { merge: true });
+    await saveUserSettings();
     renderRecurringChips();
 }
 
-// --- Date Formatting & Day Ingestion ---
+// --- Smart Flexible Keyword Analytics Tracker ---
+async function addKeywordTracker() {
+    const input = document.getElementById("tracker-input");
+    const val = input.value.trim().toLowerCase();
+    if (val && !trackedKeywords.includes(val) && currentUser) {
+        trackedKeywords.push(val);
+        input.value = "";
+        await saveUserSettings();
+        calculateAdvancedStats();
+    }
+}
+
+async function removeKeywordTracker(idx) {
+    trackedKeywords.splice(idx, 1);
+    await saveUserSettings();
+    calculateAdvancedStats();
+}
+
+// --- Date Formatting (Gregorian / الميلادي) ---
 function getFormattedDate(dateObj = new Date()) {
-    return dateObj.toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    return dateObj.toLocaleDateString("ar-EG", { 
+        calendar: "gregory", 
+        weekday: "long", 
+        year: "numeric", 
+        month: "long", 
+        day: "numeric" 
+    });
 }
 
 function autoAddTodayIfMissing() {
@@ -259,7 +293,6 @@ function autoAddTodayIfMissing() {
                 createdAt: Date.now(),
             });
 
-            // Automatically inject recurring tasks into today
             if (recurringTasksList.length > 0) {
                 const batch = db.batch();
                 recurringTasksList.forEach(taskText => {
@@ -286,17 +319,16 @@ function scheduleMidnightAutoAdd() {
 function login() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
 function logout() { auth.signOut(); }
 
-// --- Advanced Calculation & Banner Sync ---
+// --- Advanced Calculation (Registered, Pending, Completed) ---
 async function calculateAdvancedStats() {
     if (!currentUser) return;
 
     try {
         const daysSnap = await db.collection("task_days").where("userId", "==", currentUser.uid).get();
 
-        let totalTasks = 0, completedTasks = 0, weekCompleted = 0, monthCompleted = 0;
-        const now = Date.now();
-        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-        const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+        let totalRegistered = 0;
+        let pendingTasks = 0;
+        let completedTasks = 0;
         const todayFormatted = getFormattedDate();
 
         let todayTotal = 0, todayDone = 0;
@@ -305,43 +337,40 @@ async function calculateAdvancedStats() {
 
         const promises = daysSnap.docs.map(doc => ({
             date: doc.data().date,
-            createdAt: doc.data().createdAt || 0,
             promise: db.collection("task_days").doc(doc.id).collection("items").get()
         }));
 
         const itemsSnapshots = await Promise.all(promises.map(p => p.promise));
 
         itemsSnapshots.forEach((snap, idx) => {
-            const dayCreatedAt = promises[idx].createdAt;
             const isToday = promises[idx].date === todayFormatted;
-            const isWithinWeek = (now - dayCreatedAt) <= SEVEN_DAYS_MS;
-            const isWithinMonth = (now - dayCreatedAt) <= THIRTY_DAYS_MS;
 
             snap.forEach(itemDoc => {
                 const itemData = itemDoc.data();
-                totalTasks++;
+                totalRegistered++; // إجمالي المهام المسجلة
                 if (isToday) todayTotal++;
 
                 if (itemData.done) {
-                    completedTasks++;
+                    completedTasks++; // المكتملة
                     if (isToday) todayDone++;
-                    if (isWithinWeek) weekCompleted++;
-                    if (isWithinMonth) monthCompleted++;
-
-                    const textLower = (itemData.text || "").toLowerCase();
-                    trackedKeywords.forEach(kw => {
-                        if (textLower.includes(kw.toLowerCase())) keywordCounts[kw]++;
-                    });
+                } else {
+                    pendingTasks++; // غير المنفذة
                 }
+
+                const textLower = (itemData.text || "").toLowerCase();
+                trackedKeywords.forEach(kw => {
+                    if (textLower.includes(kw.toLowerCase()) && itemData.done) {
+                        keywordCounts[kw]++;
+                    }
+                });
             });
         });
 
+        document.getElementById("stat-total-registered").textContent = totalRegistered;
+        document.getElementById("stat-pending").textContent = pendingTasks;
         document.getElementById("stat-completed").textContent = completedTasks;
-        document.getElementById("stat-week").textContent = weekCompleted;
-        document.getElementById("stat-month").textContent = monthCompleted;
-        document.getElementById("stat-ratio").textContent = totalTasks === 0 ? "0%" : Math.round((completedTasks / totalTasks) * 100) + "%";
+        document.getElementById("stat-ratio").textContent = totalRegistered === 0 ? "0%" : Math.round((completedTasks / totalRegistered) * 100) + "%";
 
-        // Update Today Banner
         document.getElementById("today-status-text").textContent = `${todayDone} من ${todayTotal} مهام مكتملة`;
         const todayPct = todayTotal > 0 ? (todayDone / todayTotal) * 100 : 0;
         document.getElementById("today-progress-fill").style.width = `${todayPct}%`;
@@ -356,25 +385,16 @@ function renderTrackerChips(counts) {
     const container = document.getElementById("tracker-chips");
     if (!container) return;
     container.innerHTML = "";
-    Object.keys(counts).forEach(kw => {
+    trackedKeywords.forEach((kw, idx) => {
+        const count = counts[kw] || 0;
         const chip = document.createElement("div");
         chip.className = "tracker-chip";
-        chip.innerHTML = `<span>${kw}</span><span class="count">${counts[kw]} مرة</span>`;
+        chip.innerHTML = `<span>${kw}</span><span class="count">${count} مرة</span> <button onclick="removeKeywordTracker(${idx})" style="background:transparent; color:var(--danger); font-size:0.8rem;">✖</button>`;
         container.appendChild(chip);
     });
 }
 
-function addKeywordTracker() {
-    const input = document.getElementById("tracker-input");
-    const val = input.value.trim();
-    if (val && !trackedKeywords.includes(val)) {
-        trackedKeywords.push(val);
-        input.value = "";
-        calculateAdvancedStats();
-    }
-}
-
-// --- Load & Render Tasks with Drag and Drop ---
+// --- Load & Render Tasks ---
 function loadInitialTasks() {
     const container = document.getElementById("tasks-container");
     if (!container || !currentUser) return;
@@ -479,7 +499,6 @@ function loadItems(dayId) {
         list.innerHTML = "";
         list.appendChild(fragment);
 
-        // Enable Drag & Drop
         new Sortable(list, { animation: 150 });
 
         const progress = snap.size > 0 ? (doneCount / snap.size) * 100 : 0;
@@ -523,7 +542,7 @@ async function deleteDay(dayId) {
     }
 }
 
-// --- Export Data Feature ---
+// --- Export Data ---
 async function exportData() {
     if (!currentUser) return;
     const snap = await db.collection("task_days").where("userId", "==", currentUser.uid).get();
@@ -554,7 +573,7 @@ function filterTasks() {
 
 function scrollToTop() { window.scrollTo({ top: 0, behavior: "smooth" }); }
 
-// --- Prayer Times ---
+// --- Gregorian Prayer Times ---
 function initPrayerTimes() {
     if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(
@@ -573,13 +592,16 @@ async function fetchPrayerTimes(lat, lng) {
         const data = await res.json();
         if (data && data.data) {
             const timings = data.data.timings;
+            const gregorian = data.data.date.gregorian;
+
             document.getElementById("t-Fajr").textContent = formatTime12(timings.Fajr);
             document.getElementById("t-Dhuhr").textContent = formatTime12(timings.Dhuhr);
             document.getElementById("t-Asr").textContent = formatTime12(timings.Asr);
             document.getElementById("t-Maghrib").textContent = formatTime12(timings.Maghrib);
             document.getElementById("t-Isha").textContent = formatTime12(timings.Isha);
-            document.getElementById("prayer-date").textContent = `${data.data.date.hijri.day} ${data.data.date.hijri.month.ar} ${data.data.date.hijri.year} هـ`;
-            document.getElementById("prayer-city").textContent = data.data.meta.timezone ? data.data.meta.timezone.split('/')[1] : "القاهرة";
+
+            document.getElementById("prayer-date").textContent = `${gregorian.day} ${gregorian.month.en} ${gregorian.year}`;
+            document.getElementById("prayer-city").textContent = data.data.meta.timezone ? data.data.meta.timezone.split('/')[1] : "موقعك الحالي";
         }
     } catch (e) { console.error(e); }
 }
