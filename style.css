@@ -74,14 +74,16 @@ button, .btn {
 .btn-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
 .btn-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
 
-.icon-btn {
+.icon-btn, .change-city-btn {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     color: var(--text-main);
-    padding: 8px 12px;
-    border-radius: 10px;
-    font-size: 1.1rem;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
 }
+.change-city-btn:hover { background: var(--primary); color: white; }
 
 .header {
     display: flex;
@@ -117,7 +119,8 @@ button, .btn {
     width: 100%; max-width: 750px; background: var(--card-bg); backdrop-filter: blur(16px);
     border-radius: 20px; border: 1px solid var(--border-color); padding: 16px 20px; margin-bottom: 20px; box-shadow: var(--shadow-glow);
 }
-.prayer-header { display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--text-muted); margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+.prayer-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; color: var(--text-muted); margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+.prayer-location { display: flex; align-items: center; gap: 8px; color: #a5b4fc; font-weight: 700; }
 .prayer-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
 .prayer-card {
     background: rgba(15, 23, 42, 0.4); padding: 12px 8px; border-radius: 14px; border: 1px solid var(--border-color); text-align: center; position: relative;
