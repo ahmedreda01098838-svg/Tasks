@@ -349,7 +349,7 @@ function login() {
 
 function logout() { auth.signOut(); }
 
-// --- Advanced Calculation ---
+// --- Advanced Calculation (All Stats Included) ---
 async function calculateAdvancedStats() {
     if (!currentUser) return;
 
@@ -359,6 +359,11 @@ async function calculateAdvancedStats() {
         let totalRegistered = 0;
         let pendingTasks = 0;
         let completedTasks = 0;
+        let weekCompleted = 0;
+        let monthCompleted = 0;
+        const now = Date.now();
+        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+        const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
         const todayFormatted = getFormattedDate();
 
         let todayTotal = 0, todayDone = 0;
@@ -367,13 +372,17 @@ async function calculateAdvancedStats() {
 
         const promises = daysSnap.docs.map(doc => ({
             date: doc.data().date,
+            createdAt: doc.data().createdAt || 0,
             promise: db.collection("task_days").doc(doc.id).collection("items").get()
         }));
 
         const itemsSnapshots = await Promise.all(promises.map(p => p.promise));
 
         itemsSnapshots.forEach((snap, idx) => {
+            const dayCreatedAt = promises[idx].createdAt;
             const isToday = promises[idx].date === todayFormatted;
+            const isWithinWeek = (now - dayCreatedAt) <= SEVEN_DAYS_MS;
+            const isWithinMonth = (now - dayCreatedAt) <= THIRTY_DAYS_MS;
 
             snap.forEach(itemDoc => {
                 const itemData = itemDoc.data();
@@ -383,6 +392,8 @@ async function calculateAdvancedStats() {
                 if (itemData.done) {
                     completedTasks++;
                     if (isToday) todayDone++;
+                    if (isWithinWeek) weekCompleted++;
+                    if (isWithinMonth) monthCompleted++;
                 } else {
                     pendingTasks++;
                 }
@@ -399,6 +410,8 @@ async function calculateAdvancedStats() {
         const elReg = document.getElementById("stat-total-registered");
         const elPend = document.getElementById("stat-pending");
         const elComp = document.getElementById("stat-completed");
+        const elWeek = document.getElementById("stat-week");
+        const elMonth = document.getElementById("stat-month");
         const elRatio = document.getElementById("stat-ratio");
         const elTodayStatus = document.getElementById("today-status-text");
         const elTodayFill = document.getElementById("today-progress-fill");
@@ -406,6 +419,8 @@ async function calculateAdvancedStats() {
         if (elReg) elReg.textContent = totalRegistered;
         if (elPend) elPend.textContent = pendingTasks;
         if (elComp) elComp.textContent = completedTasks;
+        if (elWeek) elWeek.textContent = weekCompleted;
+        if (elMonth) elMonth.textContent = monthCompleted;
         if (elRatio) elRatio.textContent = totalRegistered === 0 ? "0%" : Math.round((completedTasks / totalRegistered) * 100) + "%";
 
         if (elTodayStatus) elTodayStatus.textContent = `${todayDone} من ${todayTotal} مهام مكتملة`;
@@ -643,7 +658,7 @@ async function fetchPrayerTimesByCity(city, country) {
             const dateEl = document.getElementById("prayer-date");
             const cityEl = document.getElementById("prayer-city");
 
-            if (dateEl) dateEl.textContent = `${gregorian.day} ${gregorian.month.en} ${gregorian.year}`;
+            if (dateEl) dateEl.textContent = `${gregorian.day} `${gregorian.month.en} ${gregorian.year}`;
             if (cityEl) cityEl.textContent = city;
         }
     } catch (e) {
