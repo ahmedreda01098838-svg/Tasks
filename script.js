@@ -185,7 +185,7 @@ async function saveStudySession() {
 
 async function fetchStudyStats() {
     if (!currentUser) return;
-    const snap = await db.collection("study_sessions").where("userId", "==", currentUser.uid).get();
+    const snap = await db.collection("study_sessions").where("userId", ==, currentUser.uid).get();
     let totalMins = 0;
     snap.forEach(doc => totalMins += (doc.data().durationMins || 0));
     const hours = (totalMins / 60).toFixed(1);
@@ -319,7 +319,7 @@ function scheduleMidnightAutoAdd() {
 function login() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
 function logout() { auth.signOut(); }
 
-// --- Advanced Calculation (Registered, Pending, Completed) ---
+// --- Advanced Calculation ---
 async function calculateAdvancedStats() {
     if (!currentUser) return;
 
@@ -347,14 +347,14 @@ async function calculateAdvancedStats() {
 
             snap.forEach(itemDoc => {
                 const itemData = itemDoc.data();
-                totalRegistered++; // إجمالي المهام المسجلة
+                totalRegistered++;
                 if (isToday) todayTotal++;
 
                 if (itemData.done) {
-                    completedTasks++; // المكتملة
+                    completedTasks++;
                     if (isToday) todayDone++;
                 } else {
-                    pendingTasks++; // غير المنفذة
+                    pendingTasks++;
                 }
 
                 const textLower = (itemData.text || "").toLowerCase();
@@ -542,27 +542,6 @@ async function deleteDay(dayId) {
     }
 }
 
-// --- Export Data ---
-async function exportData() {
-    if (!currentUser) return;
-    const snap = await db.collection("task_days").where("userId", "==", currentUser.uid).get();
-    let exportObj = [];
-    
-    for (let doc of snap.docs) {
-        const itemsSnap = await db.collection("task_days").doc(doc.id).collection("items").get();
-        let items = [];
-        itemsSnap.forEach(i => items.push(i.data()));
-        exportObj.push({ date: doc.data().date, items });
-    }
-
-    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Tasks_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-}
-
 function filterTasks() {
     const query = document.getElementById("search-input").value.toLowerCase();
     document.querySelectorAll(".day-card").forEach((card) => {
@@ -573,23 +552,36 @@ function filterTasks() {
 
 function scrollToTop() { window.scrollTo({ top: 0, behavior: "smooth" }); }
 
-// --- Gregorian Prayer Times ---
+// --- Fixed Prayer Times (No GPS Required) ---
 function initPrayerTimes() {
-    if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-            (pos) => fetchPrayerTimes(pos.coords.latitude, pos.coords.longitude),
-            () => fetchPrayerTimes(30.0444, 31.2357)
-        );
-    } else {
-        fetchPrayerTimes(30.0444, 31.2357);
+    let savedCity = localStorage.getItem("user_prayer_city") || "Cairo";
+    let savedCountry = localStorage.getItem("user_prayer_country") || "Egypt";
+    fetchPrayerTimesByCity(savedCity, savedCountry);
+}
+
+async function changeCityPrompt() {
+    const { value: cityName } = await Swal.fire({
+        title: "أدخل اسم مدينتك (بالإنجليزية أو العربية)",
+        input: "text",
+        inputPlaceholder: "مثال: Cairo, Alexandria, Riyadh...",
+        showCancelButton: true,
+        confirmButtonText: "حفظ",
+        cancelButtonText: "إلغاء"
+    });
+
+    if (cityName && cityName.trim() !== "") {
+        localStorage.setItem("user_prayer_city", cityName.trim());
+        localStorage.setItem("user_prayer_country", "Global");
+        fetchPrayerTimesByCity(cityName.trim(), "Global");
     }
 }
 
-async function fetchPrayerTimes(lat, lng) {
+async function fetchPrayerTimesByCity(city, country) {
     try {
         const todayStr = new Date().toISOString().split('T')[0].split('-').reverse().join('-');
-        const res = await fetch(`https://api.aladhan.com/v1/timings/${todayStr}?latitude=${lat}&longitude=${lng}&method=5`);
+        const res = await fetch(`https://api.aladhan.com/v1/timingsByCity/${todayStr}?city=${city}&country=${country}&method=5`);
         const data = await res.json();
+        
         if (data && data.data) {
             const timings = data.data.timings;
             const gregorian = data.data.date.gregorian;
@@ -601,9 +593,11 @@ async function fetchPrayerTimes(lat, lng) {
             document.getElementById("t-Isha").textContent = formatTime12(timings.Isha);
 
             document.getElementById("prayer-date").textContent = `${gregorian.day} ${gregorian.month.en} ${gregorian.year}`;
-            document.getElementById("prayer-city").textContent = data.data.meta.timezone ? data.data.meta.timezone.split('/')[1] : "موقعك الحالي";
+            document.getElementById("prayer-city").textContent = city;
         }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error("خطأ في جلب مواقيت الصلاة:", e);
+    }
 }
 
 function formatTime12(time24) {
