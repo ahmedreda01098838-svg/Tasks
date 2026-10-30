@@ -23,7 +23,7 @@ let currentUser = null;
 let activeListeners = {};
 let midnightTimer = null;
 let lastVisibleDoc = null; 
-const PAGE_SIZE = 10; 
+const PAGE_SIZE = 5; // عدد الأيام في كل صفحة لتحميل أسرع
 
 let trackedKeywords = [];
 let recurringTasksList = [];
@@ -450,47 +450,71 @@ function renderTrackerChips(counts) {
     });
 }
 
-// --- Load & Render Tasks ---
+// --- Load & Render Tasks (Optimized & Fast) ---
 function loadInitialTasks() {
     const container = document.getElementById("tasks-container");
+    const loadMoreBtn = document.getElementById("load-more-btn");
     if (!container || !currentUser) return;
 
-    db.collection("task_days").where("userId", "==", currentUser.uid).orderBy("createdAt", "desc").limit(PAGE_SIZE).onSnapshot((snap) => {
-        const spinner = document.getElementById("loading-spinner");
-        if (spinner) spinner.remove();
+    db.collection("task_days")
+        .where("userId", "==", currentUser.uid)
+        .orderBy("createdAt", "desc")
+        .limit(PAGE_SIZE)
+        .get()
+        .then((snap) => {
+            const spinner = document.getElementById("loading-spinner");
+            if (spinner) spinner.remove();
 
-        if (snap.empty) {
-            container.innerHTML = '<p class="loading-text" style="text-align:center; padding:20px;">لا توجد أيام مضافة بعد. ابدأ بإضافة مهامك اليومية!</p>';
-            return;
-        }
-
-        lastVisibleDoc = snap.docs[snap.docs.length - 1];
-
-        snap.docChanges().forEach((change) => {
-            const dayId = change.doc.id;
-            if (change.type === "added") renderDay(change.doc, change.newIndex);
-            else if (change.type === "removed") {
-                const card = document.getElementById(`card-${dayId}`);
-                if (card) card.remove();
-                calculateAdvancedStats();
+            if (snap.empty) {
+                container.innerHTML = '<p class="loading-text" style="text-align:center; padding:20px;">لا توجد أيام مضافة بعد. ابدأ بإضافة مهامك اليومية!</p>';
+                if (loadMoreBtn) loadMoreBtn.style.display = "none";
+                return;
             }
+
+            lastVisibleDoc = snap.docs[snap.docs.length - 1];
+            container.innerHTML = ""; // تفريغ الحاوية أولاً
+
+            snap.docs.forEach((doc) => {
+                renderDay(doc);
+            });
+
+            // إظهار زر تحميل المزيد إذا كان هناك احتمالية لوجود أيام أخرى
+            if (loadMoreBtn) {
+                loadMoreBtn.style.display = snap.docs.length < PAGE_SIZE ? "none" : "block";
+            }
+        })
+        .catch((error) => {
+            console.error("Firestore Error:", error);
+            if (container) container.innerHTML = `<p class="loading-text" style="color: var(--danger);">حدث خطأ أثناء تحميل المهام: ${error.message}</p>`;
         });
-    }, (error) => {
-        console.error("Firestore Error:", error);
-        if (container) container.innerHTML = `<p class="loading-text" style="color: var(--danger);">حدث خطأ أثناء تحميل المهام: ${error.message}</p>`;
-    });
 }
 
 function loadMoreTasks() {
     if (!lastVisibleDoc || !currentUser) return;
-    db.collection("task_days").where("userId", "==", currentUser.uid).orderBy("createdAt", "desc").startAfter(lastVisibleDoc).limit(PAGE_SIZE).get().then((snap) => {
-        if (snap.empty) return;
-        lastVisibleDoc = snap.docs[snap.docs.length - 1];
-        snap.docs.forEach((doc) => renderDay(doc, -1));
-    }).catch(e => console.error(e));
+    const loadMoreBtn = document.getElementById("load-more-btn");
+
+    db.collection("task_days")
+        .where("userId", "==", currentUser.uid)
+        .orderBy("createdAt", "desc")
+        .startAfter(lastVisibleDoc)
+        .limit(PAGE_SIZE)
+        .get()
+        .then((snap) => {
+            if (snap.empty) {
+                if (loadMoreBtn) loadMoreBtn.style.display = "none";
+                return;
+            }
+            lastVisibleDoc = snap.docs[snap.docs.length - 1];
+            snap.docs.forEach((doc) => renderDay(doc));
+
+            if (snap.docs.length < PAGE_SIZE && loadMoreBtn) {
+                loadMoreBtn.style.display = "none";
+            }
+        })
+        .catch(e => console.error(e));
 }
 
-function renderDay(doc, targetIndex) {
+function renderDay(doc) {
     const dayId = doc.id;
     const data = doc.data();
     const container = document.getElementById("tasks-container");
@@ -512,9 +536,7 @@ function renderDay(doc, targetIndex) {
         </div>
     `;
 
-    if (targetIndex === -1 || targetIndex >= container.children.length) container.appendChild(dayCard);
-    else container.insertBefore(dayCard, container.children[targetIndex]);
-
+    container.appendChild(dayCard);
     loadItems(dayId);
 }
 
@@ -522,8 +544,14 @@ function addTask(dayId) {
     const input = document.getElementById(`input-${dayId}`);
     const text = input.value.trim();
     if (text && currentUser) {
-        db.collection("task_days").doc(dayId).collection("items").add({ text, done: false, createdAt: Date.now() }).then(() => calculateAdvancedStats()).catch(e => console.error(e));
-        input.value = "";
+        db.collection("task_days").doc(dayId).collection("items").add({ 
+            text, 
+            done: false, 
+            createdAt: Date.now() 
+        }).then(() => {
+            input.value = "";
+            calculateAdvancedStats();
+        }).catch(e => console.error(e));
     }
 }
 
@@ -544,6 +572,7 @@ function loadItems(dayId) {
 
             const itemDiv = document.createElement("div");
             itemDiv.className = `task-item ${item.done ? "done" : ""}`;
+            itemDiv.id = `task-item-${itemDoc.id}`;
             itemDiv.innerHTML = `
                 <div style="display:flex; align-items:center; gap:10px; flex:1;">
                     <input type="checkbox" ${item.done ? "checked" : ""} onclick="toggleTask('${dayId}', '${itemDoc.id}', ${item.done})">
@@ -573,17 +602,36 @@ function loadItems(dayId) {
     activeListeners[dayId] = unsubscribe;
 }
 
+// تحديث فوري (Optimistic UI) لمنع التهنيج والبطء
 function toggleTask(dayId, taskId, currentStatus) {
-    db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ done: !currentStatus }).then(() => {
-        if (!currentStatus) playNotificationAudio();
+    const itemDiv = document.getElementById(`task-item-${taskId}`);
+    const newStatus = !currentStatus;
+
+    // تحديث الشكل فوراً في واجهة المستخدم قبل انتظار السيرفر
+    if (itemDiv) {
+        if (newStatus) {
+            itemDiv.classList.add("done");
+        } else {
+            itemDiv.classList.remove("done");
+        }
+    }
+
+    if (!newStatus) playNotificationAudio();
+
+    db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ done: newStatus }).then(() => {
         calculateAdvancedStats();
-    }).catch(e => console.error(e));
+    }).catch((e) => {
+        console.error(e);
+        // التراجع في حال حدوث خطأ
+    });
 }
 
 async function editTask(dayId, taskId, currentText) {
     const { value: newText } = await Swal.fire({ title: "تعديل المهمة", input: "text", inputValue: currentText, showCancelButton: true });
     if (newText && newText.trim() !== currentText) {
-        db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ text: newText.trim() }).catch(e => console.error(e));
+        db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ text: newText.trim() }).then(() => {
+            calculateAdvancedStats();
+        }).catch(e => console.error(e));
     }
 }
 
@@ -599,6 +647,9 @@ async function deleteDay(dayId) {
         items.forEach((i) => batch.delete(i.ref));
         await batch.commit();
         await db.collection("task_days").doc(dayId).delete();
+        
+        const card = document.getElementById(`card-${dayId}`);
+        if (card) card.remove();
         calculateAdvancedStats();
     }
 }
