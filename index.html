@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>منظم المهام اليومية 📌 Tasks(aamd)</title>
     
-    <!-- External Fonts & Scripts -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -13,9 +13,10 @@
     <!-- CSS File -->
     <link rel="stylesheet" href="style.css">
     
-    <!-- SweetAlert2 & Confetti -->
+    <!-- External Libraries -->
     <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
     <!-- Firebase SDKs (Compat v9) -->
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -25,7 +26,7 @@
     <!-- JS File -->
     <script defer src="script.js"></script>
 </head>
-<body>
+<body class="dark-theme">
 
     <!-- Header Section -->
     <header class="header">
@@ -33,13 +34,28 @@
             <span class="logo-icon">📌</span>
             <h1>Tasks<span class="highlight">(aamd)</span></h1>
         </div>
-        <div class="user-profile" id="user-profile"></div>
+        <div class="header-actions">
+            <button class="icon-btn" onclick="toggleTheme()" id="theme-btn" title="تبديل المظهر">🌙</button>
+            <button class="icon-btn" onclick="exportData()" title="تصدير نسخة احتياطية">📥</button>
+            <div class="user-profile" id="user-profile"></div>
+        </div>
     </header>
 
-    <!-- Prayer Times Bar -->
+    <!-- Daily Summary Banner -->
+    <section class="today-banner" id="today-banner" style="display: none;">
+        <div class="banner-info">
+            <span class="banner-title">🔥 إنجاز اليوم الحالي</span>
+            <span class="banner-status" id="today-status-text">0 من 0 مهام مكتملة</span>
+        </div>
+        <div class="banner-progress-bg">
+            <div class="banner-progress-fill" id="today-progress-fill"></div>
+        </div>
+    </section>
+
+    <!-- Prayer Times Widget -->
     <section class="prayer-widget" id="prayer-widget">
         <div class="prayer-header">
-            <div class="prayer-location">📍 <span id="prayer-city">جاري التحديد...</span></div>
+            <div class="prayer-location">🕋 مواقيت الصلاة — <span id="prayer-city">جاري التحديد...</span></div>
             <div class="prayer-date" id="prayer-date">---</div>
         </div>
         <div class="prayer-grid" id="prayer-grid">
@@ -51,13 +67,32 @@
         </div>
     </section>
 
+    <!-- Advanced Study & Pomodoro Timer Widget -->
+    <section class="timer-section" id="timer-section" style="display: none;">
+        <div class="timer-header-wrapper">
+            <span class="timer-title">⏳ مؤقت المذاكرة والتركيز</span>
+            <div class="timer-mode-selector">
+                <button class="mode-btn active" id="mode-stopwatch" onclick="switchTimerMode('stopwatch')">عداد تصاعدي</button>
+                <button class="mode-btn" id="mode-pomodoro" onclick="switchTimerMode('pomodoro')">بومودورو (25د)</button>
+            </div>
+        </div>
+        <div class="timer-display" id="timer-display">00:00:00</div>
+        <div class="timer-controls">
+            <button class="btn btn-success" id="timer-start-btn" onclick="startTimer()">▶ تشغيل</button>
+            <button class="btn btn-warning" id="timer-pause-btn" onclick="pauseTimer()" style="display: none;">⏸ إيقاف مؤقت</button>
+            <button class="btn btn-danger" onclick="resetTimer()">🔄 إعادة ضبط</button>
+            <button class="btn btn-accent" onclick="saveStudySession()">💾 تسجيل الجلسة</button>
+        </div>
+        <div class="study-stats-summary" id="study-stats-summary">إجمالي المذاكرة المسجلة: 0 ساعة</div>
+    </section>
+
     <!-- Overall & Periodic Statistics Dashboard -->
     <section class="dashboard-panel" id="dashboard-panel" style="display: none;">
         <div class="stat-card">
             <span class="stat-icon">✅</span>
             <div>
                 <span class="stat-title">المهام المكتملة</span>
-                <span class="stat-value" id="stat-total">0</span>
+                <span class="stat-value" id="stat-completed">0</span>
             </div>
         </div>
         <div class="stat-card">
@@ -77,10 +112,20 @@
         <div class="stat-card">
             <span class="stat-icon">🎯</span>
             <div>
-                <span class="stat-title">نسبة الإنجاز</span>
+                <span class="stat-title">نسبة الإنجاز الكلية</span>
                 <span class="stat-value" id="stat-ratio">0%</span>
             </div>
         </div>
+    </section>
+
+    <!-- Recurring Tasks Manager -->
+    <section class="recurring-section" id="recurring-section" style="display: none;">
+        <div class="tracker-title">🔄 المهام المتكررة تلقائياً لجميع الأيام الجديدة</div>
+        <div class="tracker-input-group">
+            <input type="text" id="recurring-input" placeholder="مثال: أذكار الصباح، ورد القرآن..." onkeypress="if(event.key==='Enter') addRecurringTask()">
+            <button class="btn btn-accent" onclick="addRecurringTask()">➕ إضافة تلقائية</button>
+        </div>
+        <div class="tracker-chips" id="recurring-chips"></div>
     </section>
 
     <!-- Custom Task Count Analytics Tracker -->
