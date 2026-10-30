@@ -36,7 +36,6 @@
         </div>
         <div class="header-actions">
             <button class="icon-btn" onclick="toggleTheme()" id="theme-btn" title="تبديل المظهر">🌙</button>
-            <button class="icon-btn" onclick="exportData()" title="تصدير نسخة احتياطية">📥</button>
             <div class="user-profile" id="user-profile"></div>
         </div>
     </header>
@@ -55,7 +54,10 @@
     <!-- Prayer Times Widget -->
     <section class="prayer-widget" id="prayer-widget">
         <div class="prayer-header">
-            <div class="prayer-location">🕋 مواقيت الصلاة — <span id="prayer-city">جاري التحديد...</span></div>
+            <div class="prayer-location">
+                🕋 مواقيت الصلاة — <span id="prayer-city">القاهرة</span>
+                <button onclick="changeCityPrompt()" class="change-city-btn" title="تغيير المدينه">✏️</button>
+            </div>
             <div class="prayer-date" id="prayer-date">---</div>
         </div>
         <div class="prayer-grid" id="prayer-grid">
@@ -86,7 +88,7 @@
         <div class="study-stats-summary" id="study-stats-summary">إجمالي المذاكرة المسجلة: 0 ساعة</div>
     </section>
 
-    <!-- Overall & Periodic Statistics Dashboard (Updated) -->
+    <!-- Overall & Periodic Statistics Dashboard -->
     <section class="dashboard-panel" id="dashboard-panel" style="display: none;">
         <div class="stat-card">
             <span class="stat-icon">📋</span>
