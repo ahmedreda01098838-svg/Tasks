@@ -86,33 +86,33 @@
         <div class="study-stats-summary" id="study-stats-summary">إجمالي المذاكرة المسجلة: 0 ساعة</div>
     </section>
 
-    <!-- Overall & Periodic Statistics Dashboard -->
+    <!-- Overall & Periodic Statistics Dashboard (Updated) -->
     <section class="dashboard-panel" id="dashboard-panel" style="display: none;">
+        <div class="stat-card">
+            <span class="stat-icon">📋</span>
+            <div>
+                <span class="stat-title">المهام المسجلة</span>
+                <span class="stat-value" id="stat-total-registered">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <span class="stat-icon">⏳</span>
+            <div>
+                <span class="stat-title">غير المنفذة</span>
+                <span class="stat-value" id="stat-pending">0</span>
+            </div>
+        </div>
         <div class="stat-card">
             <span class="stat-icon">✅</span>
             <div>
-                <span class="stat-title">المهام المكتملة</span>
+                <span class="stat-title">المكتملة</span>
                 <span class="stat-value" id="stat-completed">0</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <span class="stat-icon">📅</span>
-            <div>
-                <span class="stat-title">إنجاز الأسبوع</span>
-                <span class="stat-value" id="stat-week">0</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <span class="stat-icon">🗓️</span>
-            <div>
-                <span class="stat-title">إنجاز الشهر</span>
-                <span class="stat-value" id="stat-month">0</span>
             </div>
         </div>
         <div class="stat-card">
             <span class="stat-icon">🎯</span>
             <div>
-                <span class="stat-title">نسبة الإنجاز الكلية</span>
+                <span class="stat-title">نسبة الإنجاز</span>
                 <span class="stat-value" id="stat-ratio">0%</span>
             </div>
         </div>
@@ -130,10 +130,10 @@
 
     <!-- Custom Task Count Analytics Tracker -->
     <section class="tracker-section" id="tracker-section" style="display: none;">
-        <div class="tracker-title">📊 تحليل تكرار المهام (قرآن، ذاكرت، جيم...)</div>
+        <div class="tracker-title">📊 تحليل تكرار المهام (اكتب الكلمات التي تريد تتبعها بالأسفل)</div>
         <div class="tracker-input-group">
-            <input type="text" id="tracker-input" placeholder="أضف كلمة مفتاحية (مثل: قرآن)..." onkeypress="if(event.key==='Enter') addKeywordTracker()">
-            <button class="btn btn-accent" onclick="addKeywordTracker()">➕ تحليل</button>
+            <input type="text" id="tracker-input" placeholder="أضف كلمة للتحليل (مثل: جيم، gym، مذاكرة)..." onkeypress="if(event.key==='Enter') addKeywordTracker()">
+            <button class="btn btn-accent" onclick="addKeywordTracker()">➕ إضافة للتحليل</button>
         </div>
         <div class="tracker-chips" id="tracker-chips"></div>
     </section>
