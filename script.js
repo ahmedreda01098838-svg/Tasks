@@ -23,7 +23,7 @@ let currentUser = null;
 let activeListeners = {};
 let midnightTimer = null;
 let lastVisibleDoc = null; 
-const PAGE_SIZE = 5; // عدد الأيام في كل صفحة لتحميل أسرع
+const PAGE_SIZE = 5; 
 
 let trackedKeywords = [];
 let recurringTasksList = [];
@@ -60,6 +60,7 @@ function initApp() {
             if (timerSec) timerSec.style.display = "block";
             if (bannerSec) bannerSec.style.display = "block";
             if (searchBar) searchBar.style.display = "block";
+            if (loadMoreBtn) loadMoreBtn.style.display = "block"; // ضمان إظهار الزر
 
             if (profileDiv) {
                 profileDiv.innerHTML = `
@@ -450,7 +451,7 @@ function renderTrackerChips(counts) {
     });
 }
 
-// --- Load & Render Tasks (Optimized & Fast) ---
+// --- Load & Render Tasks (Optimized for Mobile) ---
 function loadInitialTasks() {
     const container = document.getElementById("tasks-container");
     const loadMoreBtn = document.getElementById("load-more-btn");
@@ -472,15 +473,14 @@ function loadInitialTasks() {
             }
 
             lastVisibleDoc = snap.docs[snap.docs.length - 1];
-            container.innerHTML = ""; // تفريغ الحاوية أولاً
+            container.innerHTML = ""; 
 
             snap.docs.forEach((doc) => {
                 renderDay(doc);
             });
 
-            // إظهار زر تحميل المزيد إذا كان هناك احتمالية لوجود أيام أخرى
             if (loadMoreBtn) {
-                loadMoreBtn.style.display = snap.docs.length < PAGE_SIZE ? "none" : "block";
+                loadMoreBtn.style.display = "block"; // إبقاء الزر ظاهراً لجلب المزيد دائماً
             }
         })
         .catch((error) => {
@@ -502,14 +502,11 @@ function loadMoreTasks() {
         .then((snap) => {
             if (snap.empty) {
                 if (loadMoreBtn) loadMoreBtn.style.display = "none";
+                Swal.fire({ title: "تنبيه", text: "لا توجد أيام قديمة أخرى لعرضها.", icon: "info", timer: 1500, showConfirmButton: false });
                 return;
             }
             lastVisibleDoc = snap.docs[snap.docs.length - 1];
             snap.docs.forEach((doc) => renderDay(doc));
-
-            if (snap.docs.length < PAGE_SIZE && loadMoreBtn) {
-                loadMoreBtn.style.display = "none";
-            }
         })
         .catch(e => console.error(e));
 }
@@ -602,12 +599,11 @@ function loadItems(dayId) {
     activeListeners[dayId] = unsubscribe;
 }
 
-// تحديث فوري (Optimistic UI) لمنع التهنيج والبطء
+// استجابة فورية سريعة جداً للموبايل (Optimistic UI)
 function toggleTask(dayId, taskId, currentStatus) {
     const itemDiv = document.getElementById(`task-item-${taskId}`);
     const newStatus = !currentStatus;
 
-    // تحديث الشكل فوراً في واجهة المستخدم قبل انتظار السيرفر
     if (itemDiv) {
         if (newStatus) {
             itemDiv.classList.add("done");
@@ -622,7 +618,6 @@ function toggleTask(dayId, taskId, currentStatus) {
         calculateAdvancedStats();
     }).catch((e) => {
         console.error(e);
-        // التراجع في حال حدوث خطأ
     });
 }
 
