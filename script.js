@@ -698,17 +698,22 @@ async function fetchPrayerTimesByCity(city, country) {
             const timings = data.data.timings;
             const gregorian = data.data.date.gregorian;
 
-            const fEl = document.getElementById("t-Fajr");
-            const dEl = document.getElementById("t-Dhuhr");
-            const aEl = document.getElementById("t-Asr");
-            const mEl = document.getElementById("t-Maghrib");
-            const iEl = document.getElementById("t-Isha");
+            const prayers = [
+                { id: 'p-Fajr', timeKey: 'Fajr', name: 'الفجر', timeStr: timings.Fajr },
+                { id: 'p-Dhuhr', timeKey: 'Dhuhr', name: 'الظهر', timeStr: timings.Dhuhr },
+                { id: 'p-Asr', timeKey: 'Asr', name: 'العصر', timeStr: timings.Asr },
+                { id: 'p-Maghrib', timeKey: 'Maghrib', name: 'المغرب', timeStr: timings.Maghrib },
+                { id: 'p-Isha', timeKey: 'Isha', name: 'العشاء', timeStr: timings.Isha }
+            ];
 
-            if (fEl) fEl.textContent = formatTime12(timings.Fajr);
-            if (dEl) dEl.textContent = formatTime12(timings.Dhuhr);
-            if (aEl) aEl.textContent = formatTime12(timings.Asr);
-            if (mEl) mEl.textContent = formatTime12(timings.Maghrib);
-            if (iEl) iEl.textContent = formatTime12(timings.Isha);
+            // تحديث النصوص في الواجهة
+            prayers.forEach(p => {
+                const timeEl = document.getElementById(`t-${p.timeKey}`);
+                if (timeEl) timeEl.textContent = formatTime12(p.timeStr);
+            });
+
+            // حساب أي صلاة عليها الدور وتظليلها
+            highlightCurrentPrayer(prayers);
 
             const dateEl = document.getElementById("prayer-date");
             const cityEl = document.getElementById("prayer-city");
@@ -718,6 +723,31 @@ async function fetchPrayerTimesByCity(city, country) {
         }
     } catch (e) {
         console.error("خطأ في جلب مواقيت الصلاة:", e);
+    }
+}
+
+// دالة تحديد وتظليل الصلاة القادمة أو الحالية
+function highlightCurrentPrayer(prayers) {
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    let activePrayerId = prayers[prayers.length - 1].id; // افتراضياً العشاء إذا انتهى اليوم
+
+    for (let i = 0; i < prayers.length; i++) {
+        const [h, m] = prayers[i].timeStr.split(':').map(Number);
+        const prayerMinutes = h * 60 + m;
+
+        if (currentMinutes < prayerMinutes) {
+            activePrayerId = prayers[i].id;
+            break;
+        }
+    }
+
+    // إزالة التظليل القديم وتطبيق الجديد
+    document.querySelectorAll(".prayer-card").forEach(card => card.classList.remove("active"));
+    const activeCard = document.getElementById(activePrayerId);
+    if (activeCard) {
+        activeCard.classList.add("active");
     }
 }
 
