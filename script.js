@@ -8,12 +8,15 @@ const firebaseConfig = {
     appId: "1:189812947761:web:c8dd4c8cc3534e84a90e10",
 };
 
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
 const db = firebase.firestore();
 const auth = firebase.auth();
 
 db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
-    if (err.code === "failed-precondition") console.warn("التخزين المحلي يعمل في تبويب آخر.");
+    console.warn("التخزين المحلي يعمل في تبويب آخر أو غير مدعوم.");
 });
 
 let currentUser = null;
@@ -60,9 +63,9 @@ function initApp() {
 
             if (profileDiv) {
                 profileDiv.innerHTML = `
-                    <div class="user-info">
-                        <img src="${user.photoURL}" class="user-avatar" alt="avatar" loading="lazy">
-                        <button onclick="logout()" class="logout-btn" title="تسجيل الخروج">🚪</button>
+                    <div class="user-info" style="display: flex; align-items: center; gap: 8px;">
+                        <img src="${user.photoURL || ''}" class="user-avatar" alt="avatar" loading="lazy" style="width:35px; height:35px; border-radius:50%;">
+                        <button onclick="logout()" class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8rem;">خروج 🚪</button>
                     </div>
                 `;
             }
@@ -83,8 +86,17 @@ function initApp() {
             if (searchBar) searchBar.style.display = "none";
             if (loadMoreBtn) loadMoreBtn.style.display = "none";
             
-            if (container) container.innerHTML = '<p class="loading-text">يرجى تسجيل الدخول أولاً لحفظ مهامك سحابياً.</p>';
-            if (profileDiv) profileDiv.innerHTML = `<button onclick="login()" class="btn btn-primary">🔐 دخول بجوجل</button>`;
+            if (container) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 30px; background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border-color);">
+                        <p class="loading-text" style="margin-bottom: 15px;">يرجى تسجيل الدخول لحفظ وعرض مهامك سحابياً.</p>
+                        <button onclick="login()" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">🔐 تسجيل الدخول بجوجل</button>
+                    </div>
+                `;
+            }
+            if (profileDiv) {
+                profileDiv.innerHTML = `<button onclick="login()" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.85rem;">دخول 🔐</button>`;
+            }
 
             if (midnightTimer) clearTimeout(midnightTimer);
             Object.keys(activeListeners).forEach((id) => activeListeners[id]());
@@ -185,33 +197,46 @@ async function saveStudySession() {
 
 async function fetchStudyStats() {
     if (!currentUser) return;
-    const snap = await db.collection("study_sessions").where("userId", ==, currentUser.uid).get();
-    let totalMins = 0;
-    snap.forEach(doc => totalMins += (doc.data().durationMins || 0));
-    const hours = (totalMins / 60).toFixed(1);
-    document.getElementById("study-stats-summary").textContent = `إجمالي المذاكرة المسجلة: ${hours} ساعة (${totalMins} دقيقة)`;
+    try {
+        const snap = await db.collection("study_sessions").where("userId", "==", currentUser.uid).get();
+        let totalMins = 0;
+        snap.forEach(doc => totalMins += (doc.data().durationMins || 0));
+        const hours = (totalMins / 60).toFixed(1);
+        const summaryEl = document.getElementById("study-stats-summary");
+        if (summaryEl) summaryEl.textContent = `إجمالي المذاكرة المسجلة: ${hours} ساعة (${totalMins} دقيقة)`;
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 // --- Audio Feedback ---
 function playNotificationAudio() {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.3);
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+    } catch (e) {
+        console.warn("Audio Context blocked");
+    }
 }
 
 // --- Fetch User Settings & Trackers ---
 async function fetchUserDataSettings() {
     if (!currentUser) return;
-    const doc = await db.collection("user_settings").doc(currentUser.uid).get();
-    if (doc.exists) {
-        const data = doc.data();
-        if (data.recurringTasks) recurringTasksList = data.recurringTasks;
-        if (data.trackedKeywords) trackedKeywords = data.trackedKeywords;
-        renderRecurringChips();
+    try {
+        const doc = await db.collection("user_settings").doc(currentUser.uid).get();
+        if (doc.exists) {
+            const data = doc.data();
+            if (data.recurringTasks) recurringTasksList = data.recurringTasks;
+            if (data.trackedKeywords) trackedKeywords = data.trackedKeywords;
+            renderRecurringChips();
+        }
+    } catch (e) {
+        console.error(e);
     }
 }
 
@@ -252,7 +277,6 @@ async function removeRecurringTask(idx) {
     renderRecurringChips();
 }
 
-// --- Smart Flexible Keyword Analytics Tracker ---
 async function addKeywordTracker() {
     const input = document.getElementById("tracker-input");
     const val = input.value.trim().toLowerCase();
@@ -270,7 +294,7 @@ async function removeKeywordTracker(idx) {
     calculateAdvancedStats();
 }
 
-// --- Date Formatting (Gregorian / الميلادي) ---
+// --- Date Formatting (Gregorian) ---
 function getFormattedDate(dateObj = new Date()) {
     return dateObj.toLocaleDateString("ar-EG", { 
         calendar: "gregory", 
@@ -316,7 +340,13 @@ function scheduleMidnightAutoAdd() {
     }, midnight.getTime() - now.getTime());
 }
 
-function login() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+function login() { 
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch((error) => {
+        console.error("Login Error:", error);
+        Swal.fire("خطأ في تسجيل الدخول", error.message, "error");
+    }); 
+}
+
 function logout() { auth.signOut(); }
 
 // --- Advanced Calculation ---
@@ -366,14 +396,21 @@ async function calculateAdvancedStats() {
             });
         });
 
-        document.getElementById("stat-total-registered").textContent = totalRegistered;
-        document.getElementById("stat-pending").textContent = pendingTasks;
-        document.getElementById("stat-completed").textContent = completedTasks;
-        document.getElementById("stat-ratio").textContent = totalRegistered === 0 ? "0%" : Math.round((completedTasks / totalRegistered) * 100) + "%";
+        const elReg = document.getElementById("stat-total-registered");
+        const elPend = document.getElementById("stat-pending");
+        const elComp = document.getElementById("stat-completed");
+        const elRatio = document.getElementById("stat-ratio");
+        const elTodayStatus = document.getElementById("today-status-text");
+        const elTodayFill = document.getElementById("today-progress-fill");
 
-        document.getElementById("today-status-text").textContent = `${todayDone} من ${todayTotal} مهام مكتملة`;
+        if (elReg) elReg.textContent = totalRegistered;
+        if (elPend) elPend.textContent = pendingTasks;
+        if (elComp) elComp.textContent = completedTasks;
+        if (elRatio) elRatio.textContent = totalRegistered === 0 ? "0%" : Math.round((completedTasks / totalRegistered) * 100) + "%";
+
+        if (elTodayStatus) elTodayStatus.textContent = `${todayDone} من ${todayTotal} مهام مكتملة`;
         const todayPct = todayTotal > 0 ? (todayDone / todayTotal) * 100 : 0;
-        document.getElementById("today-progress-fill").style.width = `${todayPct}%`;
+        if (elTodayFill) elTodayFill.style.width = `${todayPct}%`;
 
         renderTrackerChips(keywordCounts);
     } catch (err) {
@@ -404,7 +441,7 @@ function loadInitialTasks() {
         if (spinner) spinner.remove();
 
         if (snap.empty) {
-            container.innerHTML = '<p class="loading-text">لا توجد أيام مضافة بعد.</p>';
+            container.innerHTML = '<p class="loading-text" style="text-align:center; padding:20px;">لا توجد أيام مضافة بعد. ابدأ بإضافة مهامك اليومية!</p>';
             return;
         }
 
@@ -419,6 +456,9 @@ function loadInitialTasks() {
                 calculateAdvancedStats();
             }
         });
+    }, (error) => {
+        console.error("Firestore Error:", error);
+        if (container) container.innerHTML = `<p class="loading-text" style="color: var(--danger);">حدث خطأ أثناء تحميل المهام: ${error.message}</p>`;
     });
 }
 
@@ -499,7 +539,9 @@ function loadItems(dayId) {
         list.innerHTML = "";
         list.appendChild(fragment);
 
-        new Sortable(list, { animation: 150 });
+        if (typeof Sortable !== "undefined") {
+            new Sortable(list, { animation: 150 });
+        }
 
         const progress = snap.size > 0 ? (doneCount / snap.size) * 100 : 0;
         bar.style.width = progress + "%";
@@ -552,7 +594,7 @@ function filterTasks() {
 
 function scrollToTop() { window.scrollTo({ top: 0, behavior: "smooth" }); }
 
-// --- Fixed Prayer Times (No GPS Required) ---
+// --- Fixed Prayer Times ---
 function initPrayerTimes() {
     let savedCity = localStorage.getItem("user_prayer_city") || "Cairo";
     let savedCountry = localStorage.getItem("user_prayer_country") || "Egypt";
@@ -586,14 +628,23 @@ async function fetchPrayerTimesByCity(city, country) {
             const timings = data.data.timings;
             const gregorian = data.data.date.gregorian;
 
-            document.getElementById("t-Fajr").textContent = formatTime12(timings.Fajr);
-            document.getElementById("t-Dhuhr").textContent = formatTime12(timings.Dhuhr);
-            document.getElementById("t-Asr").textContent = formatTime12(timings.Asr);
-            document.getElementById("t-Maghrib").textContent = formatTime12(timings.Maghrib);
-            document.getElementById("t-Isha").textContent = formatTime12(timings.Isha);
+            const fEl = document.getElementById("t-Fajr");
+            const dEl = document.getElementById("t-Dhuhr");
+            const aEl = document.getElementById("t-Asr");
+            const mEl = document.getElementById("t-Maghrib");
+            const iEl = document.getElementById("t-Isha");
 
-            document.getElementById("prayer-date").textContent = `${gregorian.day} ${gregorian.month.en} ${gregorian.year}`;
-            document.getElementById("prayer-city").textContent = city;
+            if (fEl) fEl.textContent = formatTime12(timings.Fajr);
+            if (dEl) dEl.textContent = formatTime12(timings.Dhuhr);
+            if (aEl) aEl.textContent = formatTime12(timings.Asr);
+            if (mEl) mEl.textContent = formatTime12(timings.Maghrib);
+            if (iEl) iEl.textContent = formatTime12(timings.Isha);
+
+            const dateEl = document.getElementById("prayer-date");
+            const cityEl = document.getElementById("prayer-city");
+
+            if (dateEl) dateEl.textContent = `${gregorian.day} ${gregorian.month.en} ${gregorian.year}`;
+            if (cityEl) cityEl.textContent = city;
         }
     } catch (e) {
         console.error("خطأ في جلب مواقيت الصلاة:", e);
