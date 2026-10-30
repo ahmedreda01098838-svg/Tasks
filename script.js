@@ -60,7 +60,7 @@ function initApp() {
             if (timerSec) timerSec.style.display = "block";
             if (bannerSec) bannerSec.style.display = "block";
             if (searchBar) searchBar.style.display = "block";
-            if (loadMoreBtn) loadMoreBtn.style.display = "block"; // ضمان إظهار الزر
+            if (loadMoreBtn) loadMoreBtn.style.display = "block";
 
             if (profileDiv) {
                 profileDiv.innerHTML = `
@@ -480,7 +480,7 @@ function loadInitialTasks() {
             });
 
             if (loadMoreBtn) {
-                loadMoreBtn.style.display = "block"; // إبقاء الزر ظاهراً لجلب المزيد دائماً
+                loadMoreBtn.style.display = "block";
             }
         })
         .catch((error) => {
