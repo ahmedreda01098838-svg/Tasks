@@ -374,3 +374,400 @@ async function calculateAdvancedStats() {
         };
 
         const promises = daysSnap.docs.map(doc => ({
+            date: doc.data().date,
+            createdAt: doc.data().createdAt || 0,
+            promise: db.collection("task_days").doc(doc.id).collection("items").get()
+        }));
+
+        const itemsSnapshots = await Promise.all(promises.map(p => p.promise));
+
+        itemsSnapshots.forEach((snap, idx) => {
+            const dayCreatedAt = promises[idx].createdAt;
+            const isToday = promises[idx].date === todayFormatted;
+            const isWithinWeek = (now - dayCreatedAt) <= SEVEN_DAYS_MS;
+            const isWithinMonth = (now - dayCreatedAt) <= THIRTY_DAYS_MS;
+
+            snap.forEach(itemDoc => {
+                const itemData = itemDoc.data();
+                totalRegistered++;
+                if (isToday) todayTotal++;
+
+                if (itemData.done) {
+                    completedTasks++;
+                    if (isToday) todayDone++;
+                    if (isWithinWeek) weekCompleted++;
+                    if (isWithinMonth) monthCompleted++;
+
+                    if (itemData.text) {
+                        const txt = itemData.text.toLowerCase();
+                        
+                        if (txt.includes('قرآن') || txt.includes('قران') || txt.includes('سورة') || txt.includes('الكهف') || txt.includes('جزء') || txt.includes('ورد') || txt.includes('تلاوة')) {
+                            categoryCounts["📖 القرآن والورد"]++;
+                        } else if (txt.includes('أذكار') || txt.includes('اذكار') || txt.includes('دعاء') || txt.includes('استغفار') || txt.includes('تسبيح')) {
+                            categoryCounts["🤲 الأذكار والأدعية"]++;
+                        } else if (txt.includes('لينكس') || txt.includes('linux') || txt.includes('برمجة') || txt.includes('كود') || txt.includes('سكربت') || txt.includes('python') || txt.includes('bash')) {
+                            categoryCounts["💻 لينكس والبرمجة"]++;
+                        } else if (txt.includes('جيم') || txt.includes('gym') || txt.includes('تمارين') || txt.includes('رياضة') || txt.includes('تمرين')) {
+                            categoryCounts["🏋️ الرياضة والجيم"]++;
+                        } else if (txt.includes('مذاكرة') || txt.includes('دراسة') || txt.includes('محاضرة') || txt.includes('سكشن') || txt.includes('كويز') || txt.includes('امتحان') || txt.includes('كلية') || txt.includes('جامعة') || txt.includes('مادة')) {
+                            categoryCounts["📚 المذاكرة الجامعية"]++;
+                        }
+                    }
+                } else {
+                    pendingTasks++;
+                }
+            });
+        });
+
+        let activeCategories = Object.entries(categoryCounts)
+            .filter(([cat, count]) => count > 0)
+            .sort((a, b) => b[1] - a[1]);
+
+        const elReg = document.getElementById("stat-total-registered");
+        const elPend = document.getElementById("stat-pending");
+        const elComp = document.getElementById("stat-completed");
+        const elWeek = document.getElementById("stat-week");
+        const elMonth = document.getElementById("stat-month");
+        const elRatio = document.getElementById("stat-ratio");
+        const elTodayStatus = document.getElementById("today-status-text");
+        const elTodayFill = document.getElementById("today-progress-fill");
+
+        if (elReg) elReg.textContent = totalRegistered;
+        if (elPend) elPend.textContent = pendingTasks;
+        if (elComp) elComp.textContent = completedTasks;
+        if (elWeek) elWeek.textContent = weekCompleted;
+        if (elMonth) elMonth.textContent = monthCompleted;
+        if (elRatio) elRatio.textContent = totalRegistered === 0 ? "0%" : Math.round((completedTasks / totalRegistered) * 100) + "%";
+
+        if (elTodayStatus) elTodayStatus.textContent = `${todayDone} من ${todayTotal} مهام مكتملة`;
+        const todayPct = todayTotal > 0 ? (todayDone / todayTotal) * 100 : 0;
+        if (elTodayFill) elTodayFill.style.width = `${todayPct}%`;
+
+        renderSmartTrackerChips(activeCategories);
+    } catch (err) {
+        console.error("خطأ الإحصائيات:", err);
+    }
+}
+
+function renderSmartTrackerChips(categories) {
+    const container = document.getElementById("tracker-chips");
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (categories.length === 0) {
+        container.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-muted);">أكمل بعض المهام (مثل المواد الدراسية، القرآن، اللينكس) ليقوم التطبيق بتصنيفها تلقائياً هنا...</span>';
+        return;
+    }
+
+    categories.forEach(([catName, count]) => {
+        const chip = document.createElement("div");
+        chip.className = "tracker-chip";
+        chip.innerHTML = `<span>${catName}</span><span class="count">${count} مرات</span>`;
+        container.appendChild(chip);
+    });
+}
+
+// --- Load & Render Tasks (Optimized for Mobile) ---
+function loadInitialTasks() {
+    const container = document.getElementById("tasks-container");
+    const loadMoreBtn = document.getElementById("load-more-btn");
+    if (!container || !currentUser) return;
+
+    db.collection("task_days")
+        .where("userId", "==", currentUser.uid)
+        .orderBy("createdAt", "desc")
+        .limit(PAGE_SIZE)
+        .get()
+        .then((snap) => {
+            const spinner = document.getElementById("loading-spinner");
+            if (spinner) spinner.remove();
+
+            container.innerHTML = ""; 
+
+            if (snap.empty) {
+                container.innerHTML = '<p class="loading-text" style="text-align:center; padding:20px; color: var(--text-muted);">لا توجد أيام مضافة بعد. سيتم إنشاء يومك الحالي تلقائياً!</p>';
+                if (loadMoreBtn) loadMoreBtn.style.display = "none";
+                return;
+            }
+
+            lastVisibleDoc = snap.docs[snap.docs.length - 1];
+
+            snap.docs.forEach((doc) => {
+                renderDay(doc);
+            });
+
+            if (loadMoreBtn) {
+                loadMoreBtn.style.display = "block";
+            }
+        })
+        .catch((error) => {
+            console.error("Firestore Error:", error);
+            const spinner = document.getElementById("loading-spinner");
+            if (spinner) spinner.remove();
+            if (container) container.innerHTML = `<p class="loading-text" style="color: var(--danger);">حدث خطأ أثناء تحميل المهام: ${error.message}</p>`;
+        });
+}
+
+function loadMoreTasks() {
+    if (!lastVisibleDoc || !currentUser) return;
+    const loadMoreBtn = document.getElementById("load-more-btn");
+
+    db.collection("task_days")
+        .where("userId", "==", currentUser.uid)
+        .orderBy("createdAt", "desc")
+        .startAfter(lastVisibleDoc)
+        .limit(PAGE_SIZE)
+        .get()
+        .then((snap) => {
+            if (snap.empty) {
+                if (loadMoreBtn) loadMoreBtn.style.display = "none";
+                Swal.fire({ title: "تنبيه", text: "لا توجد أيام قديمة أخرى لعرضها.", icon: "info", timer: 1500, showConfirmButton: false });
+                return;
+            }
+            lastVisibleDoc = snap.docs[snap.docs.length - 1];
+            snap.docs.forEach((doc) => renderDay(doc));
+        })
+        .catch(e => console.error(e));
+}
+
+function renderDay(doc) {
+    const dayId = doc.id;
+    const data = doc.data();
+    const container = document.getElementById("tasks-container");
+    if (document.getElementById(`card-${dayId}`)) return;
+
+    const dayCard = document.createElement("div");
+    dayCard.className = "day-card";
+    dayCard.id = `card-${dayId}`;
+    dayCard.innerHTML = `
+        <div class="day-header">
+            <h3>📅 ${data.date}</h3>
+            <button class="delete-btn" onclick="deleteDay('${dayId}')">🗑️</button>
+        </div>
+        <div class="progress-container"><div class="progress-bar" id="bar-${dayId}"></div></div>
+        <div id="list-${dayId}"></div>
+        <div class="input-group">
+            <input type="text" id="input-${dayId}" placeholder="اكتب مهمة جديدة..." onkeypress="if(event.key==='Enter') addTask('${dayId}')">
+            <button class="btn btn-primary" onclick="addTask('${dayId}')">➕ إدراج</button>
+        </div>
+    `;
+
+    container.appendChild(dayCard);
+    loadItems(dayId);
+}
+
+function addTask(dayId) {
+    const input = document.getElementById(`input-${dayId}`);
+    const text = input.value.trim();
+    if (text && currentUser) {
+        db.collection("task_days").doc(dayId).collection("items").add({ 
+            text, 
+            done: false, 
+            createdAt: Date.now() 
+        }).then(() => {
+            input.value = "";
+            calculateAdvancedStats();
+        }).catch(e => console.error(e));
+    }
+}
+
+function loadItems(dayId) {
+    if (activeListeners[dayId]) activeListeners[dayId]();
+
+    const unsubscribe = db.collection("task_days").doc(dayId).collection("items").orderBy("createdAt", "asc").onSnapshot((snap) => {
+        const list = document.getElementById(`list-${dayId}`);
+        const bar = document.getElementById(`bar-${dayId}`);
+        if (!list || !bar) return;
+
+        const fragment = document.createDocumentFragment();
+        let doneCount = 0;
+
+        snap.forEach((itemDoc) => {
+            const item = itemDoc.data();
+            if (item.done) doneCount++;
+
+            const itemDiv = document.createElement("div");
+            itemDiv.className = `task-item ${item.done ? "done" : ""}`;
+            itemDiv.id = `task-item-${itemDoc.id}`;
+            itemDiv.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px; flex:1;">
+                    <input type="checkbox" ${item.done ? "checked" : ""} onclick="toggleTask('${dayId}', '${itemDoc.id}', ${item.done})">
+                    <span class="task-text">${item.text}</span>
+                </div>
+                <button class="edit-task-btn" onclick="editTask('${dayId}', '${itemDoc.id}', '${item.text.replace(/'/g, "\\'")}')">✏️</button>
+                <button class="delete-task-btn" onclick="deleteSingleTask('${dayId}', '${itemDoc.id}')">✖</button>
+            `;
+            fragment.appendChild(itemDiv);
+        });
+
+        list.innerHTML = "";
+        list.appendChild(fragment);
+
+        if (typeof Sortable !== "undefined") {
+            new Sortable(list, { 
+                animation: 150,
+                delay: 200, 
+                delayOnTouchOnly: true, 
+                touchStartThreshold: 5 
+            });
+        }
+
+        const progress = snap.size > 0 ? (doneCount / snap.size) * 100 : 0;
+        bar.style.width = progress + "%";
+
+        if (progress === 100 && snap.size > 0 && typeof confetti === "function") {
+            confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+        }
+    });
+
+    activeListeners[dayId] = unsubscribe;
+}
+
+// استجابة فورية سريعة جداً للموبايل (Optimistic UI)
+function toggleTask(dayId, taskId, currentStatus) {
+    const itemDiv = document.getElementById(`task-item-${taskId}`);
+    const newStatus = !currentStatus;
+
+    if (itemDiv) {
+        if (newStatus) {
+            itemDiv.classList.add("done");
+        } else {
+            itemDiv.classList.remove("done");
+        }
+    }
+
+    if (!newStatus) playNotificationAudio();
+
+    db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ done: newStatus }).then(() => {
+        calculateAdvancedStats();
+    }).catch((e) => {
+        console.error(e);
+    });
+}
+
+async function editTask(dayId, taskId, currentText) {
+    const { value: newText } = await Swal.fire({ title: "تعديل المهمة", input: "text", inputValue: currentText, showCancelButton: true });
+    if (newText && newText.trim() !== currentText) {
+        db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ text: newText.trim() }).then(() => {
+            calculateAdvancedStats();
+        }).catch(e => console.error(e));
+    }
+}
+
+function deleteSingleTask(dayId, taskId) {
+    db.collection("task_days").doc(dayId).collection("items").doc(taskId).delete().then(() => calculateAdvancedStats()).catch(e => console.error(e));
+}
+
+async function deleteDay(dayId) {
+    const result = await Swal.fire({ title: "حذف اليوم؟", icon: "warning", showCancelButton: true });
+    if (result.isConfirmed) {
+        const items = await db.collection("task_days").doc(dayId).collection("items").get();
+        const batch = db.batch();
+        items.forEach((i) => batch.delete(i.ref));
+        await batch.commit();
+        await db.collection("task_days").doc(dayId).delete();
+        
+        const card = document.getElementById(`card-${dayId}`);
+        if (card) card.remove();
+        calculateAdvancedStats();
+    }
+}
+
+function filterTasks() {
+    const query = document.getElementById("search-input").value.toLowerCase();
+    document.querySelectorAll(".day-card").forEach((card) => {
+        const matches = card.textContent.toLowerCase().includes(query);
+        card.style.display = matches ? "block" : "none";
+    });
+}
+
+function scrollToTop() { window.scrollTo({ top: 0, behavior: "smooth" }); }
+
+// --- Fixed Prayer Times ---
+function initPrayerTimes() {
+    let savedCity = localStorage.getItem("user_prayer_city") || "Cairo";
+    let savedCountry = localStorage.getItem("user_prayer_country") || "Egypt";
+    fetchPrayerTimesByCity(savedCity, savedCountry);
+}
+
+async function changeCityPrompt() {
+    const { value: cityName } = await Swal.fire({
+        title: "أدخل اسم مدينتك (بالإنجليزية أو العربية)",
+        input: "text",
+        inputPlaceholder: "مثال: Cairo, Alexandria, Riyadh...",
+        showCancelButton: true,
+        confirmButtonText: "حفظ",
+        cancelButtonText: "إلغاء"
+    });
+
+    if (cityName && cityName.trim() !== "") {
+        localStorage.setItem("user_prayer_city", cityName.trim());
+        localStorage.setItem("user_prayer_country", "Global");
+        fetchPrayerTimesByCity(cityName.trim(), "Global");
+    }
+}
+
+async function fetchPrayerTimesByCity(city, country) {
+    try {
+        const todayStr = new Date().toISOString().split('T')[0].split('-').reverse().join('-');
+        const res = await fetch(`https://api.aladhan.com/v1/timingsByCity/${todayStr}?city=${city}&country=${country}&method=5`);
+        const data = await res.json();
+        
+        if (data && data.data) {
+            const timings = data.data.timings;
+            const gregorian = data.data.date.gregorian;
+
+            const prayers = [
+                { id: 'p-Fajr', timeKey: 'Fajr', name: 'الفجر', timeStr: timings.Fajr },
+                { id: 'p-Dhuhr', timeKey: 'Dhuhr', name: 'الظهر', timeStr: timings.Dhuhr },
+                { id: 'p-Asr', timeKey: 'Asr', name: 'العصر', timeStr: timings.Asr },
+                { id: 'p-Maghrib', timeKey: 'Maghrib', name: 'المغرب', timeStr: timings.Maghrib },
+                { id: 'p-Isha', timeKey: 'Isha', name: 'العشاء', timeStr: timings.Isha }
+            ];
+
+            prayers.forEach(p => {
+                const timeEl = document.getElementById(`t-${p.timeKey}`);
+                if (timeEl) timeEl.textContent = formatTime12(p.timeStr);
+            });
+
+            highlightCurrentPrayer(prayers);
+
+            const dateEl = document.getElementById("prayer-date");
+            const cityEl = document.getElementById("prayer-city");
+
+            if (dateEl) dateEl.textContent = `${gregorian.day} ${gregorian.month.en} ${gregorian.year}`;
+            if (cityEl) cityEl.textContent = city;
+        }
+    } catch (e) {
+        console.error("خطأ في جلب مواقيت الصلاة:", e);
+    }
+}
+
+function highlightCurrentPrayer(prayers) {
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    let activePrayerId = prayers[prayers.length - 1].id;
+
+    for (let i = 0; i < prayers.length; i++) {
+        const [h, m] = prayers[i].timeStr.split(':').map(Number);
+        const prayerMinutes = h * 60 + m;
+
+        if (currentMinutes < prayerMinutes) {
+            activePrayerId = prayers[i].id;
+            break;
+        }
+    }
+
+    document.querySelectorAll(".prayer-card").forEach(card => card.classList.remove("active"));
+    const activeCard = document.getElementById(activePrayerId);
+    if (activeCard) {
+        activeCard.classList.add("active");
+    }
+}
+
+function formatTime12(time24) {
+    const clean = time24.split(' ')[0];
+    const [h, m] = clean.split(':').map(Number);
+    return `${h % 12 || 12}:${m < 10 ? '0' : ''}${m} ${h >= 12 ? 'م' : 'ص'}`;
+}
