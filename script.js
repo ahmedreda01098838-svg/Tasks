@@ -25,7 +25,6 @@ let midnightTimer = null;
 let lastVisibleDoc = null; 
 const PAGE_SIZE = 5; 
 
-let trackedKeywords = [];
 let recurringTasksList = [];
 
 // Timer / Pomodoro States
@@ -225,7 +224,7 @@ function playNotificationAudio() {
     }
 }
 
-// --- Fetch User Settings & Trackers ---
+// --- Fetch User Settings & Recurring Tasks ---
 async function fetchUserDataSettings() {
     if (!currentUser) return;
     try {
@@ -235,11 +234,7 @@ async function fetchUserDataSettings() {
             if (data.recurringTasks && Array.isArray(data.recurringTasks)) {
                 recurringTasksList = data.recurringTasks;
             }
-            if (data.trackedKeywords && Array.isArray(data.trackedKeywords)) {
-                trackedKeywords = data.trackedKeywords;
-            }
             renderRecurringChips();
-            renderTrackerChips(keywordCounts || {});
         }
     } catch (e) {
         console.error("خطأ في جلب الإعدادات:", e);
@@ -250,12 +245,10 @@ async function saveUserSettings() {
     if (!currentUser) return;
     try {
         await db.collection("user_settings").doc(currentUser.uid).set({
-            recurringTasks: recurringTasksList,
-            trackedKeywords: trackedKeywords
+            recurringTasks: recurringTasksList
         }, { merge: true });
     } catch (e) {
         console.error("خطأ في حفظ الإعدادات:", e);
-        Swal.fire("تنبيه", "فشل حفظ التغييرات سحابياً، تحقق من الاتصال.", "warning");
     }
 }
 
@@ -296,23 +289,6 @@ async function removeRecurringTask(idx) {
         await saveUserSettings();
         renderRecurringChips();
     }
-}
-
-async function addKeywordTracker() {
-    const input = document.getElementById("tracker-input");
-    const val = input.value.trim().toLowerCase();
-    if (val && !trackedKeywords.includes(val) && currentUser) {
-        trackedKeywords.push(val);
-        input.value = "";
-        await saveUserSettings();
-        calculateAdvancedStats();
-    }
-}
-
-async function removeKeywordTracker(idx) {
-    trackedKeywords.splice(idx, 1);
-    await saveUserSettings();
-    calculateAdvancedStats();
 }
 
 // --- Date Formatting (Gregorian) ---
@@ -370,7 +346,9 @@ function login() {
 
 function logout() { auth.signOut(); }
 
-// --- Advanced Calculation (All Stats Included) ---
+// --- Smart Automated Task Analytics & Grouping ---
+const stopWords = ['في', 'من', 'على', 'إلى', 'ال', 'و', 'او', 'ثم', 'بين', 'مع', 'هذا', 'هذه', 'ذلك', 'ان', 'أن', 'لكل', 'كل', 'تم'];
+
 async function calculateAdvancedStats() {
     if (!currentUser) return;
 
@@ -388,8 +366,7 @@ async function calculateAdvancedStats() {
         const todayFormatted = getFormattedDate();
 
         let todayTotal = 0, todayDone = 0;
-        let keywordCounts = {};
-        trackedKeywords.forEach(k => keywordCounts[k] = 0);
+        let smartKeywordCounts = {};
 
         const promises = daysSnap.docs.map(doc => ({
             date: doc.data().date,
@@ -415,18 +392,33 @@ async function calculateAdvancedStats() {
                     if (isToday) todayDone++;
                     if (isWithinWeek) weekCompleted++;
                     if (isWithinMonth) monthCompleted++;
+
+                    // التحليل الذكي للكلمات وتجميعها تلقائياً
+                    if (itemData.text) {
+                        let cleanText = itemData.text.toLowerCase().replace(/[^\w\sء-ي]/gi, '');
+                        let words = cleanText.split(/\s+/);
+
+                        words.forEach(word => {
+                            if (word.length > 2 && !stopWords.includes(word)) {
+                                let matchedKey = Object.keys(smartKeywordCounts).find(k => k.includes(word) || word.includes(k));
+                                
+                                if (matchedKey) {
+                                    smartKeywordCounts[matchedKey]++;
+                                } else {
+                                    smartKeywordCounts[word] = 1;
+                                }
+                            }
+                        });
+                    }
                 } else {
                     pendingTasks++;
                 }
-
-                const textLower = (itemData.text || "").toLowerCase();
-                trackedKeywords.forEach(kw => {
-                    if (textLower.includes(kw.toLowerCase()) && itemData.done) {
-                        keywordCounts[kw]++;
-                    }
-                });
             });
         });
+
+        let sortedKeywords = Object.entries(smartKeywordCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6);
 
         const elReg = document.getElementById("stat-total-registered");
         const elPend = document.getElementById("stat-pending");
@@ -448,21 +440,26 @@ async function calculateAdvancedStats() {
         const todayPct = todayTotal > 0 ? (todayDone / todayTotal) * 100 : 0;
         if (elTodayFill) elTodayFill.style.width = `${todayPct}%`;
 
-        renderTrackerChips(keywordCounts);
+        renderSmartTrackerChips(sortedKeywords);
     } catch (err) {
         console.error("خطأ الإحصائيات:", err);
     }
 }
 
-function renderTrackerChips(counts) {
+function renderSmartTrackerChips(sortedKeywords) {
     const container = document.getElementById("tracker-chips");
     if (!container) return;
     container.innerHTML = "";
-    trackedKeywords.forEach((kw, idx) => {
-        const count = counts[kw] || 0;
+
+    if (sortedKeywords.length === 0) {
+        container.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-muted);">أكمل بعض المهام ليقوم التطبيق بتحليلها وتجميعها تلقائياً هنا...</span>';
+        return;
+    }
+
+    sortedKeywords.forEach(([kw, count]) => {
         const chip = document.createElement("div");
         chip.className = "tracker-chip";
-        chip.innerHTML = `<span>${kw}</span><span class="count">${count} مرة</span> <button onclick="removeKeywordTracker(${idx})" style="background:transparent; color:var(--danger); font-size:0.8rem;">✖</button>`;
+        chip.innerHTML = `<span>⚡ ${kw}</span><span class="count">${count} مرات</span>`;
         container.appendChild(chip);
     });
 }
@@ -722,13 +719,11 @@ async function fetchPrayerTimesByCity(city, country) {
                 { id: 'p-Isha', timeKey: 'Isha', name: 'العشاء', timeStr: timings.Isha }
             ];
 
-            // تحديث النصوص في الواجهة
             prayers.forEach(p => {
                 const timeEl = document.getElementById(`t-${p.timeKey}`);
                 if (timeEl) timeEl.textContent = formatTime12(p.timeStr);
             });
 
-            // حساب أي صلاة عليها الدور وتظليلها
             highlightCurrentPrayer(prayers);
 
             const dateEl = document.getElementById("prayer-date");
@@ -742,12 +737,11 @@ async function fetchPrayerTimesByCity(city, country) {
     }
 }
 
-// دالة تحديد وتظليل الصلاة القادمة أو الحالية
 function highlightCurrentPrayer(prayers) {
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    let activePrayerId = prayers[prayers.length - 1].id; // افتراضياً العشاء إذا انتهى اليوم
+    let activePrayerId = prayers[prayers.length - 1].id;
 
     for (let i = 0; i < prayers.length; i++) {
         const [h, m] = prayers[i].timeStr.split(':').map(Number);
@@ -759,7 +753,6 @@ function highlightCurrentPrayer(prayers) {
         }
     }
 
-    // إزالة التظليل القديم وتطبيق الجديد
     document.querySelectorAll(".prayer-card").forEach(card => card.classList.remove("active"));
     const activeCard = document.getElementById(activePrayerId);
     if (activeCard) {
