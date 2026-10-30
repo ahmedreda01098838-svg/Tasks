@@ -187,98 +187,7 @@ async function saveStudySession() {
             durationMins: minutesStudied,
             createdAt: Date.now()
         });
-        Swal.fire("تم التسجيل!", `تم حفظ جلسة مذاكرة بـ ${minutesStudied} دقيقة.`, "success");
-        resetTimer();
-        fetchStudyStats();
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-async function fetchStudyStats() {
-    if (!currentUser) return;
-    try {
-        const snap = await db.collection("study_sessions").where("userId", "==", currentUser.uid).get();
-        let totalMins = 0;
-        snap.forEach(doc => totalMins += (doc.data().durationMins || 0));
-        const hours = (totalMins / 60).toFixed(1);
-        const summaryEl = document.getElementById("study-stats-summary");
-        if (summaryEl) summaryEl.textContent = `إجمالي المذاكرة المسجلة: ${hours} ساعة (${totalMins} دقيقة)`;
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-// --- Audio Feedback ---
-function playNotificationAudio() {
-    try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-        osc.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.3);
-    } catch (e) {
-        console.warn("Audio Context blocked");
-    }
-}
-
-// --- Fetch User Settings & Recurring Tasks ---
-async function fetchUserDataSettings() {
-    if (!currentUser) return;
-    try {
-        const doc = await db.collection("user_settings").doc(currentUser.uid).get();
-        if (doc.exists) {
-            const data = doc.data();
-            if (data.recurringTasks && Array.isArray(data.recurringTasks)) {
-                recurringTasksList = data.recurringTasks;
-            }
-            renderRecurringChips();
-        }
-    } catch (e) {
-        console.error("خطأ في جلب الإعدادات:", e);
-    }
-}
-
-async function saveUserSettings() {
-    if (!currentUser) return;
-    try {
-        await db.collection("user_settings").doc(currentUser.uid).set({
-            recurringTasks: recurringTasksList
-        }, { merge: true });
-    } catch (e) {
-        console.error("خطأ في حفظ الإعدادات:", e);
-    }
-}
-
-async function addRecurringTask() {
-    const input = document.getElementById("recurring-input");
-    if (!input) return;
-    const val = input.value.trim();
-    
-    if (val && currentUser) {
-        if (!recurringTasksList.includes(val)) {
-            recurringTasksList.push(val);
-            input.value = "";
-            await saveUserSettings();
-            renderRecurringChips();
-        } else {
-            input.value = "";
-            Swal.fire({ title: "ملاحظة", text: "هذه المهمة موجودة مسبقاً في القائمة المتكررة.", icon: "info", timer: 1500, showConfirmButton: false });
-        }
-    }
-}
-
-function renderRecurringChips() {
-    const container = document.getElementById("recurring-chips");
-    if (!container) return;
-    container.innerHTML = "";
-    
-    recurringTasksList.forEach((task, idx) => {
-        const chip = document.createElement("div");
-        chip.className = "tracker-chip";
-        chip.innerHTML = `<span>🔄 ${task}</span> <button onclick="removeRecurringTask(${idx})" style="background:transparent; color:var(--danger); font-size:0.8rem; cursor:pointer;">✖</button>`;
+        Swal.fire("تم التسجيل!", `تم حفظ جلسة مذاكرة بـ ${minutesStudied} دقيقة.`, "success"); resetTimer(); fetchStudyStats(); } catch (e) { console.error(e); } }  async function fetchStudyStats() { if (!currentUser) return; try { const snap = await db.collection("study_sessions").where("userId", "==", currentUser.uid).get(); let totalMins = 0; snap.forEach(doc => totalMins += (doc.data().durationMins \vert{}\vert{} 0)); const hours = (totalMins / 60).toFixed(1); const summaryEl = document.getElementById("study-stats-summary"); if (summaryEl) summaryEl.textContent = `إجمالي المذاكرة المسجلة: ${hours} ساعة (${totalMins} دقيقة)`; } catch (e) { console.error(e); } }  // --- Audio Feedback --- function playNotificationAudio() { try { const ctx = new (window.AudioContext \vert{}\vert{} window.webkitAudioContext)(); const osc = ctx.createOscillator(); osc.type = "sine"; osc.frequency.setValueAtTime(587.33, ctx.currentTime); osc.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.3); } catch (e) { console.warn("Audio Context blocked"); } }  // --- Fetch User Settings & Recurring Tasks --- async function fetchUserDataSettings() { if (!currentUser) return; try { const doc = await db.collection("user_settings").doc(currentUser.uid).get(); if (doc.exists) { const data = doc.data(); if (data.recurringTasks && Array.isArray(data.recurringTasks)) { recurringTasksList = data.recurringTasks; } renderRecurringChips(); } } catch (e) { console.error("خطأ في جلب الإعدادات:", e); } }  async function saveUserSettings() { if (!currentUser) return; try { await db.collection("user_settings").doc(currentUser.uid).set({ recurringTasks: recurringTasksList }, { merge: true }); } catch (e) { console.error("خطأ في حفظ الإعدادات:", e); } }  async function addRecurringTask() { const input = document.getElementById("recurring-input"); if (!input) return; const val = input.value.trim();  if (val && currentUser) { if (!recurringTasksList.includes(val)) { recurringTasksList.push(val); input.value = ""; await saveUserSettings(); renderRecurringChips(); } else { input.value = ""; Swal.fire({ title: "ملاحظة", text: "هذه المهمة موجودة مسبقاً في القائمة المتكررة.", icon: "info", timer: 1500, showConfirmButton: false }); } } }  function renderRecurringChips() { const container = document.getElementById("recurring-chips"); if (!container) return; container.innerHTML = "";  recurringTasksList.forEach((task, idx) => { const chip = document.createElement("div"); chip.className = "tracker-chip"; chip.innerHTML = `<span>🔄 ${task}</span> <button onclick="removeRecurringTask(${idx})" style="background:transparent; color:var(--danger); font-size:0.8rem; cursor:pointer;">✖</button>`;
         container.appendChild(chip);
     });
 }
@@ -346,9 +255,7 @@ function login() {
 
 function logout() { auth.signOut(); }
 
-// --- Smart Automated Task Analytics & Grouping ---
-const stopWords = ['في', 'من', 'على', 'إلى', 'ال', 'و', 'او', 'ثم', 'بين', 'مع', 'هذا', 'هذه', 'ذلك', 'ان', 'أن', 'لكل', 'كل', 'تم'];
-
+// --- Smart Intelligent Task Grouping (مجموعات دمج ذكية بالمعنى) ---
 async function calculateAdvancedStats() {
     if (!currentUser) return;
 
@@ -366,7 +273,15 @@ async function calculateAdvancedStats() {
         const todayFormatted = getFormattedDate();
 
         let todayTotal = 0, todayDone = 0;
-        let smartKeywordCounts = {};
+
+        // مهارات ومجموعات رئيسية شاملة للمواد والجامعة والأنشطة
+        let categoryCounts = {
+            "📚 المذاكرة الجامعية": 0,
+            "📖 القرآن والورد": 0,
+            "🤲 الأذكار والأدعية": 0,
+            "💻 لينكس والبرمجة": 0,
+            "🏋️ الرياضة والجيم": 0
+        };
 
         const promises = daysSnap.docs.map(doc => ({
             date: doc.data().date,
@@ -393,22 +308,24 @@ async function calculateAdvancedStats() {
                     if (isWithinWeek) weekCompleted++;
                     if (isWithinMonth) monthCompleted++;
 
-                    // التحليل الذكي للكلمات وتجميعها تلقائياً
+                    // --- التصنيف والدمج الذكي حسب المعنى ---
                     if (itemData.text) {
-                        let cleanText = itemData.text.toLowerCase().replace(/[^\w\sء-ي]/gi, '');
-                        let words = cleanText.split(/\s+/);
-
-                        words.forEach(word => {
-                            if (word.length > 2 && !stopWords.includes(word)) {
-                                let matchedKey = Object.keys(smartKeywordCounts).find(k => k.includes(word) || word.includes(k));
-                                
-                                if (matchedKey) {
-                                    smartKeywordCounts[matchedKey]++;
-                                } else {
-                                    smartKeywordCounts[word] = 1;
-                                }
-                            }
-                        });
+                        const txt = itemData.text.toLowerCase();
+                        
+                        if (txt.includes('قرآن') || txt.includes('قران') || txt.includes('سورة') || txt.includes('الكهف') || txt.includes('جزء') || txt.includes('ورد') || txt.includes('تلاوة')) {
+                            categoryCounts["📖 القرآن والورد"]++;
+                        } else if (txt.includes('أذكار') || txt.includes('اذكار') || txt.includes('دعاء') || txt.includes('استغفار') || txt.includes('تسبيح')) {
+                            categoryCounts["🤲 الأذكار والأدعية"]++;
+                        } else if (txt.includes('لينكس') || txt.includes('linux') || txt.includes('برمجة') || txt.includes('كود') || txt.includes('سكربت') || txt.includes('python') || txt.includes('bash')) {
+                            categoryCounts["💻 لينكس والبرمجة"]++;
+                        } else if (txt.includes('جيم') || txt.includes('gym') || txt.includes('تمارين') || txt.includes('رياضة') || txt.includes('تمرين')) {
+                            categoryCounts["🏋️ الرياضة والجيم"]++;
+                        } else if (txt.includes('مذاكرة') || txt.includes('دراسة') || txt.includes('محاضرة') || txt.includes('سكشن') || txt.includes('كويز') || txt.includes('امتحان') || txt.includes('كلية') || txt.includes('جامعة') || txt.includes('مادة')) {
+                            categoryCounts["📚 المذاكرة الجامعية"]++;
+                        } else {
+                            // أي اسم مادة أو مهمة أخرى يكتشفها التطبيق كدراسة جامعية افتراضياً إذا احتوت على كلمات عامة، أو نتركها لتصنيف عام
+                            // يمكننا إضافة أي شرط إضافي هنا حسب رغبتك
+                        }
                     }
                 } else {
                     pendingTasks++;
@@ -416,9 +333,10 @@ async function calculateAdvancedStats() {
             });
         });
 
-        let sortedKeywords = Object.entries(smartKeywordCounts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 6);
+        // تصفية الأقسام التي بها إنجاز فقط
+        let activeCategories = Object.entries(categoryCounts)
+            .filter(([cat, count]) => count > 0)
+            .sort((a, b) => b[1] - a[1]);
 
         const elReg = document.getElementById("stat-total-registered");
         const elPend = document.getElementById("stat-pending");
@@ -438,28 +356,7 @@ async function calculateAdvancedStats() {
 
         if (elTodayStatus) elTodayStatus.textContent = `${todayDone} من ${todayTotal} مهام مكتملة`;
         const todayPct = todayTotal > 0 ? (todayDone / todayTotal) * 100 : 0;
-        if (elTodayFill) elTodayFill.style.width = `${todayPct}%`;
-
-        renderSmartTrackerChips(sortedKeywords);
-    } catch (err) {
-        console.error("خطأ الإحصائيات:", err);
-    }
-}
-
-function renderSmartTrackerChips(sortedKeywords) {
-    const container = document.getElementById("tracker-chips");
-    if (!container) return;
-    container.innerHTML = "";
-
-    if (sortedKeywords.length === 0) {
-        container.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-muted);">أكمل بعض المهام ليقوم التطبيق بتحليلها وتجميعها تلقائياً هنا...</span>';
-        return;
-    }
-
-    sortedKeywords.forEach(([kw, count]) => {
-        const chip = document.createElement("div");
-        chip.className = "tracker-chip";
-        chip.innerHTML = `<span>⚡ ${kw}</span><span class="count">${count} مرات</span>`;
+        if (elTodayFill) elTodayFill.style.width = `${todayPct}\%`;  renderSmartTrackerChips(activeCategories); } catch (err) { console.error("خطأ الإحصائيات:", err); } }  function renderSmartTrackerChips(categories) { const container = document.getElementById("tracker-chips"); if (!container) return; container.innerHTML = "";  if (categories.length === 0) { container.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-muted);">أكمل بعض المهام (مثل المواد الدراسية، القرآن، اللينكس) ليقوم التطبيق بتصنيفها تلقائياً هنا...</span>'; return; }  categories.forEach(([catName, count]) => { const chip = document.createElement("div"); chip.className = "tracker-chip"; chip.innerHTML = `<span>${catName}</span><span class="count">${count} مرات</span>`;
         container.appendChild(chip);
     });
 }
@@ -528,11 +425,7 @@ function renderDay(doc) {
     const dayId = doc.id;
     const data = doc.data();
     const container = document.getElementById("tasks-container");
-    if (document.getElementById(`card-${dayId}`)) return;
-
-    const dayCard = document.createElement("div");
-    dayCard.className = "day-card";
-    dayCard.id = `card-${dayId}`;
+    if (document.getElementById(`card-${dayId}`)) return;  const dayCard = document.createElement("div"); dayCard.className = "day-card"; dayCard.id = `card-${dayId}`;
     dayCard.innerHTML = `
         <div class="day-header">
             <h3>📅 ${data.date}</h3>
@@ -569,8 +462,7 @@ function loadItems(dayId) {
     if (activeListeners[dayId]) activeListeners[dayId]();
 
     const unsubscribe = db.collection("task_days").doc(dayId).collection("items").orderBy("createdAt", "asc").onSnapshot((snap) => {
-        const list = document.getElementById(`list-${dayId}`);
-        const bar = document.getElementById(`bar-${dayId}`);
+        const list = document.getElementById(`list-${dayId}`); const bar = document.getElementById(`bar-${dayId}`);
         if (!list || !bar) return;
 
         const fragment = document.createDocumentFragment();
@@ -581,11 +473,10 @@ function loadItems(dayId) {
             if (item.done) doneCount++;
 
             const itemDiv = document.createElement("div");
-            itemDiv.className = `task-item ${item.done ? "done" : ""}`;
-            itemDiv.id = `task-item-${itemDoc.id}`;
+            itemDiv.className = `task-item ${item.done ? "done" : ""}`; itemDiv.id = `task-item-${itemDoc.id}`;
             itemDiv.innerHTML = `
                 <div style="display:flex; align-items:center; gap:10px; flex:1;">
-                    <input type="checkbox" ${item.done ? "checked" : ""} onclick="toggleTask('${dayId}', '${itemDoc.id}', ${item.done})">
+                    <input type="checkbox" ${item.done ? "checked" : ""} onclick="toggleTask('${dayId}', '${itemDoc.id}',${item.done})">
                     <span class="task-text">${item.text}</span>
                 </div>
                 <button class="edit-task-btn" onclick="editTask('${dayId}', '${itemDoc.id}', '${item.text.replace(/'/g, "\\'")}')">✏️</button>
@@ -619,49 +510,7 @@ function loadItems(dayId) {
 
 // استجابة فورية سريعة جداً للموبايل (Optimistic UI)
 function toggleTask(dayId, taskId, currentStatus) {
-    const itemDiv = document.getElementById(`task-item-${taskId}`);
-    const newStatus = !currentStatus;
-
-    if (itemDiv) {
-        if (newStatus) {
-            itemDiv.classList.add("done");
-        } else {
-            itemDiv.classList.remove("done");
-        }
-    }
-
-    if (!newStatus) playNotificationAudio();
-
-    db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ done: newStatus }).then(() => {
-        calculateAdvancedStats();
-    }).catch((e) => {
-        console.error(e);
-    });
-}
-
-async function editTask(dayId, taskId, currentText) {
-    const { value: newText } = await Swal.fire({ title: "تعديل المهمة", input: "text", inputValue: currentText, showCancelButton: true });
-    if (newText && newText.trim() !== currentText) {
-        db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ text: newText.trim() }).then(() => {
-            calculateAdvancedStats();
-        }).catch(e => console.error(e));
-    }
-}
-
-function deleteSingleTask(dayId, taskId) {
-    db.collection("task_days").doc(dayId).collection("items").doc(taskId).delete().then(() => calculateAdvancedStats()).catch(e => console.error(e));
-}
-
-async function deleteDay(dayId) {
-    const result = await Swal.fire({ title: "حذف اليوم؟", icon: "warning", showCancelButton: true });
-    if (result.isConfirmed) {
-        const items = await db.collection("task_days").doc(dayId).collection("items").get();
-        const batch = db.batch();
-        items.forEach((i) => batch.delete(i.ref));
-        await batch.commit();
-        await db.collection("task_days").doc(dayId).delete();
-        
-        const card = document.getElementById(`card-${dayId}`);
+    const itemDiv = document.getElementById(`task-item-${taskId}`); const newStatus = !currentStatus;  if (itemDiv) { if (newStatus) { itemDiv.classList.add("done"); } else { itemDiv.classList.remove("done"); } }  if (!newStatus) playNotificationAudio();  db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ done: newStatus }).then(() => { calculateAdvancedStats(); }).catch((e) => { console.error(e); }); }  async function editTask(dayId, taskId, currentText) { const { value: newText } = await Swal.fire({ title: "تعديل المهمة", input: "text", inputValue: currentText, showCancelButton: true }); if (newText && newText.trim() !== currentText) { db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ text: newText.trim() }).then(() => { calculateAdvancedStats(); }).catch(e => console.error(e)); } }  function deleteSingleTask(dayId, taskId) { db.collection("task_days").doc(dayId).collection("items").doc(taskId).delete().then(() => calculateAdvancedStats()).catch(e => console.error(e)); }  async function deleteDay(dayId) { const result = await Swal.fire({ title: "حذف اليوم؟", icon: "warning", showCancelButton: true }); if (result.isConfirmed) { const items = await db.collection("task_days").doc(dayId).collection("items").get(); const batch = db.batch(); items.forEach((i) => batch.delete(i.ref)); await batch.commit(); await db.collection("task_days").doc(dayId).delete();  const card = document.getElementById(`card-${dayId}`);
         if (card) card.remove();
         calculateAdvancedStats();
     }
@@ -704,64 +553,4 @@ async function changeCityPrompt() {
 async function fetchPrayerTimesByCity(city, country) {
     try {
         const todayStr = new Date().toISOString().split('T')[0].split('-').reverse().join('-');
-        const res = await fetch(`https://api.aladhan.com/v1/timingsByCity/${todayStr}?city=${city}&country=${country}&method=5`);
-        const data = await res.json();
-        
-        if (data && data.data) {
-            const timings = data.data.timings;
-            const gregorian = data.data.date.gregorian;
-
-            const prayers = [
-                { id: 'p-Fajr', timeKey: 'Fajr', name: 'الفجر', timeStr: timings.Fajr },
-                { id: 'p-Dhuhr', timeKey: 'Dhuhr', name: 'الظهر', timeStr: timings.Dhuhr },
-                { id: 'p-Asr', timeKey: 'Asr', name: 'العصر', timeStr: timings.Asr },
-                { id: 'p-Maghrib', timeKey: 'Maghrib', name: 'المغرب', timeStr: timings.Maghrib },
-                { id: 'p-Isha', timeKey: 'Isha', name: 'العشاء', timeStr: timings.Isha }
-            ];
-
-            prayers.forEach(p => {
-                const timeEl = document.getElementById(`t-${p.timeKey}`);
-                if (timeEl) timeEl.textContent = formatTime12(p.timeStr);
-            });
-
-            highlightCurrentPrayer(prayers);
-
-            const dateEl = document.getElementById("prayer-date");
-            const cityEl = document.getElementById("prayer-city");
-
-            if (dateEl) dateEl.textContent = `${gregorian.day} ${gregorian.month.en} ${gregorian.year}`;
-            if (cityEl) cityEl.textContent = city;
-        }
-    } catch (e) {
-        console.error("خطأ في جلب مواقيت الصلاة:", e);
-    }
-}
-
-function highlightCurrentPrayer(prayers) {
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    let activePrayerId = prayers[prayers.length - 1].id;
-
-    for (let i = 0; i < prayers.length; i++) {
-        const [h, m] = prayers[i].timeStr.split(':').map(Number);
-        const prayerMinutes = h * 60 + m;
-
-        if (currentMinutes < prayerMinutes) {
-            activePrayerId = prayers[i].id;
-            break;
-        }
-    }
-
-    document.querySelectorAll(".prayer-card").forEach(card => card.classList.remove("active"));
-    const activeCard = document.getElementById(activePrayerId);
-    if (activeCard) {
-        activeCard.classList.add("active");
-    }
-}
-
-function formatTime12(time24) {
-    const clean = time24.split(' ')[0];
-    const [h, m] = clean.split(':').map(Number);
-    return `${h % 12 || 12}:${m < 10 ? '0' : ''}${m} ${h >= 12 ? 'م' : 'ص'}`;
-}
+        const res = await fetch(`
