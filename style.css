@@ -152,8 +152,26 @@ button, .btn {
 .timer-controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .study-stats-summary { font-size: 0.8rem; color: var(--text-muted); margin-top: 12px; }
 
-.dashboard-panel { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; max-width: 750px; gap: 12px; margin-bottom: 20px; }
-.stat-card { background: var(--card-bg); backdrop-filter: blur(12px); padding: 16px 12px; border-radius: 16px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; }
+.dashboard-panel { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    width: 100%; 
+    max-width: 750px; 
+    gap: 12px; 
+    margin-bottom: 20px; 
+}
+
+.stat-card { 
+    background: var(--card-bg); 
+    backdrop-filter: blur(12px); 
+    padding: 16px 12px; 
+    border-radius: 16px; 
+    border: 1px solid var(--border-color); 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+}
+
 .stat-icon { font-size: 1.4rem; }
 .stat-title { display: block; font-size: 0.72rem; color: var(--text-muted); }
 .stat-value { font-size: 1.25rem; font-weight: 800; color: #a5b4fc; }
