@@ -585,7 +585,12 @@ function loadItems(dayId) {
         list.appendChild(fragment);
 
         if (typeof Sortable !== "undefined") {
-            new Sortable(list, { animation: 150 });
+            new Sortable(list, { 
+                animation: 150,
+                delay: 200, 
+                delayOnTouchOnly: true, 
+                touchStartThreshold: 5 
+            });
         }
 
         const progress = snap.size > 0 ? (doneCount / snap.size) * 100 : 0;
