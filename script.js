@@ -658,7 +658,7 @@ async function fetchPrayerTimesByCity(city, country) {
             const dateEl = document.getElementById("prayer-date");
             const cityEl = document.getElementById("prayer-city");
 
-            if (dateEl) dateEl.textContent = `${gregorian.day} `${gregorian.month.en} ${gregorian.year}`;
+            if (dateEl) dateEl.textContent = `${gregorian.day} ${gregorian.month.en} ${gregorian.year}`;
             if (cityEl) cityEl.textContent = city;
         }
     } catch (e) {
