@@ -232,12 +232,17 @@ async function fetchUserDataSettings() {
         const doc = await db.collection("user_settings").doc(currentUser.uid).get();
         if (doc.exists) {
             const data = doc.data();
-            if (data.recurringTasks) recurringTasksList = data.recurringTasks;
-            if (data.trackedKeywords) trackedKeywords = data.trackedKeywords;
+            if (data.recurringTasks && Array.isArray(data.recurringTasks)) {
+                recurringTasksList = data.recurringTasks;
+            }
+            if (data.trackedKeywords && Array.isArray(data.trackedKeywords)) {
+                trackedKeywords = data.trackedKeywords;
+            }
             renderRecurringChips();
+            renderTrackerChips(keywordCounts || {});
         }
     } catch (e) {
-        console.error(e);
+        console.error("خطأ في جلب الإعدادات:", e);
     }
 }
 
@@ -249,18 +254,26 @@ async function saveUserSettings() {
             trackedKeywords: trackedKeywords
         }, { merge: true });
     } catch (e) {
-        console.error(e);
+        console.error("خطأ في حفظ الإعدادات:", e);
+        Swal.fire("تنبيه", "فشل حفظ التغييرات سحابياً، تحقق من الاتصال.", "warning");
     }
 }
 
 async function addRecurringTask() {
     const input = document.getElementById("recurring-input");
+    if (!input) return;
     const val = input.value.trim();
-    if (val && !recurringTasksList.includes(val) && currentUser) {
-        recurringTasksList.push(val);
-        input.value = "";
-        await saveUserSettings();
-        renderRecurringChips();
+    
+    if (val && currentUser) {
+        if (!recurringTasksList.includes(val)) {
+            recurringTasksList.push(val);
+            input.value = "";
+            await saveUserSettings();
+            renderRecurringChips();
+        } else {
+            input.value = "";
+            Swal.fire({ title: "ملاحظة", text: "هذه المهمة موجودة مسبقاً في القائمة المتكررة.", icon: "info", timer: 1500, showConfirmButton: false });
+        }
     }
 }
 
@@ -268,18 +281,21 @@ function renderRecurringChips() {
     const container = document.getElementById("recurring-chips");
     if (!container) return;
     container.innerHTML = "";
+    
     recurringTasksList.forEach((task, idx) => {
         const chip = document.createElement("div");
         chip.className = "tracker-chip";
-        chip.innerHTML = `<span>🔄 ${task}</span> <button onclick="removeRecurringTask(${idx})" style="background:transparent; color:var(--danger); font-size:0.8rem;">✖</button>`;
+        chip.innerHTML = `<span>🔄 ${task}</span> <button onclick="removeRecurringTask(${idx})" style="background:transparent; color:var(--danger); font-size:0.8rem; cursor:pointer;">✖</button>`;
         container.appendChild(chip);
     });
 }
 
 async function removeRecurringTask(idx) {
-    recurringTasksList.splice(idx, 1);
-    await saveUserSettings();
-    renderRecurringChips();
+    if (idx > -1 && idx < recurringTasksList.length) {
+        recurringTasksList.splice(idx, 1);
+        await saveUserSettings();
+        renderRecurringChips();
+    }
 }
 
 async function addKeywordTracker() {
