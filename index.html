@@ -3,55 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منظم المهام اليومية</title>
+    <title>منظم المهام اليومية 📌 Tasks(aamd)</title>
     
-    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <!-- External Fonts & Scripts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
 
+    <!-- CSS File -->
     <link rel="stylesheet" href="style.css">
     
+    <!-- SweetAlert2 & Confetti -->
     <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
 
+    <!-- Firebase SDKs (Compat v9) -->
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
+    <!-- JS File -->
     <script defer src="script.js"></script>
 </head>
 <body>
 
+    <!-- Header Section -->
     <header class="header">
-        <h1>📌Tasks(aamd)</h1>
+        <div class="logo-container">
+            <span class="logo-icon">📌</span>
+            <h1>Tasks<span class="highlight">(aamd)</span></h1>
+        </div>
         <div class="user-profile" id="user-profile"></div>
     </header>
 
-    <div class="dashboard-panel" id="dashboard-panel" style="display: none;">
-        <div class="stat-card">
-            <span class="stat-title">إجمالي المهام</span>
-            <span class="stat-value" id="stat-total">0</span>
+    <!-- Prayer Times Bar -->
+    <section class="prayer-widget" id="prayer-widget">
+        <div class="prayer-header">
+            <div class="prayer-location">📍 <span id="prayer-city">جاري التحديد...</span></div>
+            <div class="prayer-date" id="prayer-date">---</div>
         </div>
-        <div class="stat-card">
-            <span class="stat-title">المهام المكتملة</span>
-            <span class="stat-value" id="stat-completed">0</span>
+        <div class="prayer-grid" id="prayer-grid">
+            <div class="prayer-card" id="p-Fajr"><span class="prayer-name">الفجر</span><span class="prayer-time" id="t-Fajr">--:--</span></div>
+            <div class="prayer-card" id="p-Dhuhr"><span class="prayer-name">الظهر</span><span class="prayer-time" id="t-Dhuhr">--:--</span></div>
+            <div class="prayer-card" id="p-Asr"><span class="prayer-name">العصر</span><span class="prayer-time" id="t-Asr">--:--</span></div>
+            <div class="prayer-card" id="p-Maghrib"><span class="prayer-name">المغرب</span><span class="prayer-time" id="t-Maghrib">--:--</span></div>
+            <div class="prayer-card" id="p-Isha"><span class="prayer-name">العشاء</span><span class="prayer-time" id="t-Isha">--:--</span></div>
         </div>
-        <div class="stat-card">
-            <span class="stat-title">نسبة الإنجاز</span>
-            <span class="stat-value" id="stat-ratio">0%</span>
-        </div>
-    </div>
+    </section>
 
+    <!-- Overall & Periodic Statistics Dashboard -->
+    <section class="dashboard-panel" id="dashboard-panel" style="display: none;">
+        <div class="stat-card">
+            <span class="stat-icon">✅</span>
+            <div>
+                <span class="stat-title">المهام المكتملة</span>
+                <span class="stat-value" id="stat-total">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <span class="stat-icon">📅</span>
+            <div>
+                <span class="stat-title">إنجاز الأسبوع</span>
+                <span class="stat-value" id="stat-week">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <span class="stat-icon">🗓️</span>
+            <div>
+                <span class="stat-title">إنجاز الشهر</span>
+                <span class="stat-value" id="stat-month">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <span class="stat-icon">🎯</span>
+            <div>
+                <span class="stat-title">نسبة الإنجاز</span>
+                <span class="stat-value" id="stat-ratio">0%</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Custom Task Count Analytics Tracker -->
+    <section class="tracker-section" id="tracker-section" style="display: none;">
+        <div class="tracker-title">📊 تحليل تكرار المهام (قرآن، ذاكرت، جيم...)</div>
+        <div class="tracker-input-group">
+            <input type="text" id="tracker-input" placeholder="أضف كلمة مفتاحية (مثل: قرآن)..." onkeypress="if(event.key==='Enter') addKeywordTracker()">
+            <button class="btn btn-accent" onclick="addKeywordTracker()">➕ تحليل</button>
+        </div>
+        <div class="tracker-chips" id="tracker-chips"></div>
+    </section>
+
+    <!-- Search Container -->
     <div class="search-bar-container" id="search-container" style="display: none;">
         <input type="text" id="search-input" placeholder="🔍 ابحث في المهام أو التواريخ..." oninput="filterTasks()">
     </div>
 
+    <!-- Main Tasks Container -->
     <main class="week-container" id="tasks-container">
-        <p id="loading-spinner" style="text-align:center; color: var(--text-muted); margin-top: 40px;">جاري تحميل المهام...</p>
+        <p id="loading-spinner" class="loading-text">جاري تحميل المهام...</p>
     </main>
 
-    <!-- زر تحميل المزيد من الأيام القديمة -->
-    <div style="width: 100%; max-width: 700px; text-align: center; margin: 20px 0;">
-        <button id="load-more-btn" onclick="loadMoreTasks()" style="display: none; margin: 0 auto; background: var(--card-bg); color: var(--text); border: 1px solid var(--border-color); padding: 12px 24px;">
+    <!-- Load More Button -->
+    <div class="load-more-wrapper">
+        <button id="load-more-btn" onclick="loadMoreTasks()" class="btn btn-secondary" style="display: none;">
             📥 عرض الأيام السابقة
         </button>
     </div>
