@@ -242,10 +242,14 @@ async function fetchUserDataSettings() {
 
 async function saveUserSettings() {
     if (!currentUser) return;
-    await db.collection("user_settings").doc(currentUser.uid).set({
-        recurringTasks: recurringTasksList,
-        trackedKeywords: trackedKeywords
-    }, { merge: true });
+    try {
+        await db.collection("user_settings").doc(currentUser.uid).set({
+            recurringTasks: recurringTasksList,
+            trackedKeywords: trackedKeywords
+        }, { merge: true });
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 async function addRecurringTask() {
@@ -327,7 +331,7 @@ function autoAddTodayIfMissing() {
             }
             calculateAdvancedStats();
         }
-    });
+    }).catch(e => console.error(e));
 }
 
 function scheduleMidnightAutoAdd() {
@@ -483,7 +487,7 @@ function loadMoreTasks() {
         if (snap.empty) return;
         lastVisibleDoc = snap.docs[snap.docs.length - 1];
         snap.docs.forEach((doc) => renderDay(doc, -1));
-    });
+    }).catch(e => console.error(e));
 }
 
 function renderDay(doc, targetIndex) {
@@ -518,7 +522,7 @@ function addTask(dayId) {
     const input = document.getElementById(`input-${dayId}`);
     const text = input.value.trim();
     if (text && currentUser) {
-        db.collection("task_days").doc(dayId).collection("items").add({ text, done: false, createdAt: Date.now() }).then(() => calculateAdvancedStats());
+        db.collection("task_days").doc(dayId).collection("items").add({ text, done: false, createdAt: Date.now() }).then(() => calculateAdvancedStats()).catch(e => console.error(e));
         input.value = "";
     }
 }
@@ -573,18 +577,18 @@ function toggleTask(dayId, taskId, currentStatus) {
     db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ done: !currentStatus }).then(() => {
         if (!currentStatus) playNotificationAudio();
         calculateAdvancedStats();
-    });
+    }).catch(e => console.error(e));
 }
 
 async function editTask(dayId, taskId, currentText) {
     const { value: newText } = await Swal.fire({ title: "تعديل المهمة", input: "text", inputValue: currentText, showCancelButton: true });
     if (newText && newText.trim() !== currentText) {
-        db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ text: newText.trim() });
+        db.collection("task_days").doc(dayId).collection("items").doc(taskId).update({ text: newText.trim() }).catch(e => console.error(e));
     }
 }
 
 function deleteSingleTask(dayId, taskId) {
-    db.collection("task_days").doc(dayId).collection("items").doc(taskId).delete().then(() => calculateAdvancedStats());
+    db.collection("task_days").doc(dayId).collection("items").doc(taskId).delete().then(() => calculateAdvancedStats()).catch(e => console.error(e));
 }
 
 async function deleteDay(dayId) {
